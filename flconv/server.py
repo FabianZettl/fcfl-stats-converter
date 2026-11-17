@@ -494,9 +494,11 @@ def skillset_for(pid, row, mode):
     except ValueError:
         pen = None
     d = playstyle.derive(ps, pos_of(pid), dict(penalties=pen), pid)
-    vs, vc = playstyle.from_values(row['raw'], pos_of(pid))   # skills the EA values alone make clear
-    d['skills'] |= vs
-    d['com'] |= vc
+    vs, vc = playstyle.values_fit(row['raw'], pos_of(pid))   # a skill needs the EA PlayStyle AND values that fit
+    d['skills'] &= vs
+    d['com'] &= vc
+    if d['style'] and not playstyle.style_fits(d['style'], row['raw'], pos_of(pid)):
+        d['style'] = None
     out = {}
     for key, cur, want in (('skills', pb.skills(i), d['skills']), ('com_styles', pb.com_styles(i), d['com'])):
         new = (cur | want) if mode == 'add' else set(want)

@@ -55,29 +55,46 @@ def boosts(styles):
 
 
 _MODEL = []
+STYLE_MIN_AUC = 0.70   # a playing style is only given when the values tell it apart at least this well
 
 
-def from_values(raw, pos):
-    """skills and COM playing styles that the EA FC values alone make clear (the share of right ones is at least 50 %, fitted on the players that are in the game and in the EA data, tools/fit_skills.py);
-    raw: the attribute columns of the EA FC entry"""
+def _model():
     if not _MODEL:
         try:
             _MODEL.append(json.load(open(os.path.join(HERE, '..', 'data', 'skill_model.json'))))
         except OSError:
             _MODEL.append({})
-    m = _MODEL[0]
+    return _MODEL[0]
+
+
+def _score(v, x):
+    return sum(w * a for w, a in zip(v['w'], x)) + v['b']
+
+
+def values_fit(raw, pos):
+    """the skills and COM playing styles whose values make them SAFE for the player (cross-validated share of right ones at least 50 %, tools/fit_skills.py), whatever the PlayStyles say:
+    -> (skills, com). A skill is only given when EA FC has the PlayStyle AND this test is passed."""
+    m = _model()
     if not m:
         return set(), set()
     gk = pos == 0
-    names = m['gk_attrs'] if gk else m['attrs']
     try:
-        x = [float(raw[c]) for c in names]
+        x = [float(raw[c]) for c in (m['gk_attrs'] if gk else m['attrs'])]
     except (KeyError, TypeError, ValueError):
         return set(), set()
-    sk, cm = set(), set()
-    for grp, out in ((m['gk_skills'] if gk else m['skills']), sk), ((m['com'] if not gk else {}), cm):
-        for n, v in grp.items():
-            if 'thr_hi' in v and sum(w * a for w, a in zip(v['w'], x)) + v['b'] >= v['thr_hi']:
-                out.add(n)
-    sk.discard('Captaincy')
+    # 'thr_hi' = the values alone make the skill at least 50 % sure (cross-validated); skills for which the values never reach that are never given (they cannot be given safely)
+    sk = {n for n, v in (m['gk_skills'] if gk else m['skills']).items() if 'thr_hi' in v and _score(v, x) >= v['thr_hi']}
+    cm = {n for n, v in ({} if gk else m['com']).items() if 'thr_hi' in v and _score(v, x) >= v['thr_hi']}
     return sk, cm
+
+
+def style_fits(style, raw, pos):
+    """does the playing style fit the values? Only styles that the values tell apart (AUC >= STYLE_MIN_AUC) are given at all"""
+    v = (_model().get('styles') or {}).get(style)
+    if not v or v['auc'] < STYLE_MIN_AUC:
+        return False
+    try:
+        x = [float(raw[c]) for c in (_model()['gk_attrs'] if pos == 0 else _model()['attrs'])]
+    except (KeyError, TypeError, ValueError):
+        return False
+    return _score(v, x) >= v['thr']
