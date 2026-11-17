@@ -957,6 +957,30 @@ def ml_status(tag):
     return dict(ok=True, total=len(exp), confirmed=ok, different=bad, failed=other, rows=rows[:80], game_running=bool(live_attrs()))
 
 
+GUP = dict(t=0, ok=False)
+
+
+def proxy(path, handler):
+    """photos and club logos of Gaffer, when Gaffer runs (the page shows a placeholder otherwise)"""
+    try:
+        if not GUP['ok'] and time.time() - GUP['t'] < 30:
+            raise OSError('Gaffer not reachable')
+        with urllib.request.urlopen(CFG['gaffer'] + path, timeout=8) as r:
+            GUP.update(t=time.time(), ok=True)
+            b = r.read()
+            handler.send_response(200)
+            handler.send_header('Content-Type', r.headers.get('Content-Type', 'image/png'))
+            handler.send_header('Cache-Control', 'max-age=3600')
+            handler.send_header('Content-Length', str(len(b)))
+            handler.end_headers()
+            handler.wfile.write(b)
+    except Exception:
+        GUP.update(t=time.time(), ok=False)
+        handler.send_response(404)
+        handler.send_header('Content-Length', '0')
+        handler.end_headers()
+
+
 def fs_list(path, kind=''):
     """for the folder picker of the page: the sub folders of a folder (the server runs on your own computer); path '' = the start points (drives on Windows)"""
     path = os.path.expanduser(str(path or '').strip().strip('"'))
@@ -1096,6 +1120,8 @@ class H(BaseHTTPRequestHandler):
                                     leagues=[dict(id=c, name=L['name'], n=len(L['teams'])) for c, L in sorted(M.leagues.items(), key=lambda kv: kv[1]['name'])] if M else [], backups=backups()))
             elif u.path == '/api/fs':
                 self.send_json(fs_list((q.get('path') or [''])[0], (q.get('kind') or [''])[0]))
+            elif u.path in ('/api/wiki/img', '/api/crest'):
+                proxy(self.path, self)
             elif u.path == '/api/find':
                 self.send_json(find((q.get('q') or [''])[0]))
             elif u.path == '/api/league':
@@ -1199,7 +1225,19 @@ def main():
     load()
     url = 'http://127.0.0.1:%d/' % a.port
     print('FCFL - Stats Converter on %s  (%d EA FC players%s)' % (url, len(EA.rows), ', %d players in the database' % M.pb.n if M else ', no database chosen yet'), flush=True)
-    srv = ThreadingHTTPServer(('127.0.0.1', a.port), H)
+    try:
+        srv = ThreadingHTTPServer(('127.0.0.1', a.port), H)
+    except OSError:   # already running (second click on the start icon): open the page of the running one
+        try:
+            urllib.request.urlopen(url + 'api/settings', timeout=3).read()
+        except Exception:
+            print('Port %d is in use by something else; start with --port NUMBER.' % a.port)
+            raise SystemExit(1)
+        print('Already running: %s' % url)
+        if not a.no_browser:
+            import webbrowser
+            webbrowser.open(url)
+        return
     if not a.no_browser:
         import webbrowser
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()

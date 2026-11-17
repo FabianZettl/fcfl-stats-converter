@@ -18,6 +18,7 @@ shows what would change (every attribute, old → new, with the reason) and offe
 * **Height, weight and preferred foot** of the EA FC entry are written with the stats (switch in the sidebar), each with an icon in the profile card of the player, and you can type your own values.
 * **Writing into a running Master League** (optional, needs **Gaffer**): the 25 attributes are sent to the game through Gaffer's bridge, in packages with a progress bar. See below.
 * **Search** for players and teams in the sidebar (no need to go through the league menu): type two letters, click a team to open it, a player to open him.
+* Photos and club logos from Gaffer, when it runs (a placeholder otherwise). Starting the tool a second time just opens the page of the running one.
 * Folder picker, backups with one-click restore, players that are already converted are marked and skipped.
 
 **Planned:** positions, skills, play styles and more.
