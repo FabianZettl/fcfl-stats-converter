@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FL Stats Converter: converts EA FC (or FMInside / SoFIFA page) stats into the player database of Football Life (Player.bin), for one player, a club, a league or the whole
+"""FCFL - Stats Converter: converts EA FC (or FMInside / SoFIFA page) stats into the player database of Football Life (Player.bin), for one player, a club, a league or the whole
 database, always with a backup and a check.   python3 server.py [--port 8790] [--data-dir DIR]"""
 import argparse
 import hashlib
@@ -759,7 +759,7 @@ class H(BaseHTTPRequestHandler):
 
 def main():
     global SET_FILE, DATA
-    ap = argparse.ArgumentParser(description='FL Stats Converter')
+    ap = argparse.ArgumentParser(description='FCFL - Stats Converter')
     ap.add_argument('--port', type=int, default=8790)
     ap.add_argument('--data-dir', help='where settings, backups and the original copy are kept (default: %s)' % DATA)
     ap.add_argument('--db', help='folder with Player.bin (or the file itself)')
@@ -781,7 +781,7 @@ def main():
         settings_load()
     load()
     url = 'http://127.0.0.1:%d/' % a.port
-    print('FL Stats Converter on %s  (%d EA FC players%s)' % (url, len(EA.rows), ', %d players in the database' % M.pb.n if M else ', no database chosen yet'), flush=True)
+    print('FCFL - Stats Converter on %s  (%d EA FC players%s)' % (url, len(EA.rows), ', %d players in the database' % M.pb.n if M else ', no database chosen yet'), flush=True)
     srv = ThreadingHTTPServer(('127.0.0.1', a.port), H)
     if not a.no_browser:
         import webbrowser

@@ -1,4 +1,4 @@
-# FL Stats Converter (Deutsch)
+# FCFL - Stats Converter (Deutsch)
 
 Rechnet die Werte von **EA SPORTS FC** (und von **FMInside**- und **SoFIFA**-Seiten) in die Spielerdatenbank von **Football Life** um
 (`Player.bin`, die 25 Attribute von PES 21 / eFootball): für **einen Spieler, einen Verein, eine Liga oder die ganze Datenbank**,

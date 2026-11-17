@@ -1,4 +1,4 @@
-# FL Stats Converter
+# FCFL - Stats Converter
 
 Converts **EA SPORTS FC** player stats (and pages of **FMInside** / **SoFIFA**) into the player database of
 **Football Life** (`Player.bin`, the 25 attributes of PES 21 / eFootball): for **one player, a club, a league or the whole database**,
@@ -27,7 +27,7 @@ More: [a league club](docs/screenshots/club-3-liga.png) · [another club](docs/s
 ## Start
 
 You need Python 3.9 or newer (nothing else, the tool uses only the standard library) **or** a download from the *Releases* page
-(`fl-stats-converter-windows.exe`, `fl-stats-converter-linux`).
+(`fcfl-stats-converter-windows.exe`, `fcfl-stats-converter-linux`).
 
 ```
 python3 flconv/server.py        # Linux / macOS     (or ./start.sh)

@@ -22,7 +22,7 @@ jobs:
       - run: python -m pip install pyinstaller
       - run: python tests/test_plbin.py && python tests/test_fcdb.py && python tests/test_sofifa.py
       - run: >
-          pyinstaller --onefile --noconfirm --name fl-stats-converter-${{ matrix.name }}
+          pyinstaller --onefile --noconfirm --name fcfl-stats-converter-${{ matrix.name }}
           --paths flconv --paths flconv/lib
           --add-data "flconv/static${{ matrix.sep }}static"
           --add-data "flconv/data${{ matrix.sep }}data"
@@ -30,7 +30,7 @@ jobs:
           flconv/server.py
       - uses: actions/upload-artifact@v4
         with:
-          name: fl-stats-converter-${{ matrix.name }}
+          name: fcfl-stats-converter-${{ matrix.name }}
           path: dist/*
       - if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
