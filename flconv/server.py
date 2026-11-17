@@ -583,6 +583,33 @@ def write_all(writes, srcs, names):
         return dict(ok=True, written=len(writes), names=len(names), backup=bk)
 
 
+def fs_list(path):
+    """for the folder picker of the page: the sub folders of a folder (the server runs on your own computer); path '' = the start points (drives on Windows)"""
+    path = os.path.expanduser(str(path or '').strip().strip('"'))
+    if not path:
+        if os.name == 'nt':
+            roots = [d + ':\\' for d in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' if os.path.isdir(d + ':\\')]
+        else:
+            roots = ['/'] + [os.path.join('/mnt', d) for d in sorted(os.listdir('/mnt'))] if os.path.isdir('/mnt') else ['/']
+            roots += [os.path.join('/media', d) for d in sorted(os.listdir('/media'))] if os.path.isdir('/media') else []
+        return dict(ok=True, path='', parent=None, home=os.path.expanduser('~'), dirs=[dict(name=r, path=r, player=False) for r in roots], found=None)
+    if os.path.isfile(path):
+        path = os.path.dirname(path)
+    path = os.path.abspath(path)
+    if not os.path.isdir(path):
+        return dict(ok=False, msg='This folder does not exist.')
+    dirs = []
+    try:
+        for n in sorted(os.listdir(path), key=str.lower):
+            f = os.path.join(path, n)
+            if os.path.isdir(f) and not n.startswith('.'):
+                dirs.append(dict(name=n, path=f, player=bool(resolve_pesdb(f))))
+    except OSError as ex:
+        return dict(ok=False, msg='Cannot read this folder: %s' % ex)
+    par = os.path.dirname(path)
+    return dict(ok=True, path=path, parent=par if par != path else '', home=os.path.expanduser('~'), dirs=dirs, found=resolve_pesdb(path))
+
+
 def settings_view():
     r = resolve_pesdb(SET.get('dbpath'))
     td = target_date()
@@ -640,7 +667,14 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def host_ok(self):
+        h = (self.headers.get('Host') or '').rsplit(':', 1)[0].strip('[]').lower()
+        return h in ('127.0.0.1', 'localhost', '::1')
+
     def do_GET(self):
+        if not self.host_ok():
+            self.send_json(dict(ok=False, error='forbidden'), 403)
+            return
         u = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qs(u.query)
         try:
@@ -658,6 +692,8 @@ class H(BaseHTTPRequestHandler):
             elif u.path == '/api/init':
                 self.send_json(dict(ok=True, pesdb=CFG['pesdb'], loaded=M is not None, players=M.pb.n if M else 0, ea=len(EA.rows), csv=os.path.basename(CFG['csv']),
                                     leagues=[dict(id=c, name=L['name'], n=len(L['teams'])) for c, L in sorted(M.leagues.items(), key=lambda kv: kv[1]['name'])] if M else [], backups=backups()))
+            elif u.path == '/api/fs':
+                self.send_json(fs_list((q.get('path') or [''])[0]))
             elif u.path == '/api/league':
                 self.send_json(league_view(int(q['id'][0])))
             elif u.path == '/api/missing':
@@ -682,6 +718,9 @@ class H(BaseHTTPRequestHandler):
             self.send_json(dict(ok=False, error=str(ex)), 200)
 
     def do_POST(self):
+        if not self.host_ok():
+            self.send_json(dict(ok=False, msg='forbidden'), 403)
+            return
         n = int(self.headers.get('Content-Length') or 0)
         body = json.loads(self.rfile.read(n) or b'{}')
         try:

@@ -135,10 +135,25 @@ $('#allB2').onclick=allOpen;
 if($('#misB2'))$('#misB2').onclick=()=>missing(null,'whole database');
 document.addEventListener('change',e=>{const i=e.target.closest('input.ed');if(!i||PID==null)return;const o=CH[PID]||{};o.edits=Object.assign({},o.edits||{},{[i.dataset.a]:+i.value});CH[PID]=o;openPlayer(PID,o)});
 async function stLoad(){const s=await api('/api/settings');ST=s;
-  $('#st').innerHTML='<h3>Your database</h3><div><input id="dbp" value="'+E(s.dbpath||'')+'" placeholder="Folder with Player.bin, or the file itself" title="For example the folder pesdb, or the folder common, or _FL26MyWorld" style="font-size:.74rem"><button class="btn ghost sm" id="dbB" style="margin-top:4px">Use this</button>'+(s.loaded?'<p class="mut" style="margin:6px 0 0;font-size:.74rem">'+s.players.toLocaleString()+' players loaded.</p>':'<p class="msg err" style="margin-top:6px">'+(s.dbpath?'No Player.bin found there.':'Enter the path of your Player.bin first.')+'</p>')+'</div>'
+  $('#st').innerHTML='<h3>Your database</h3><div><input id="dbp" value="'+E(s.dbpath||'')+'" placeholder="Folder with Player.bin, or the file itself" title="For example the folder pesdb, or the folder common, or _FL26MyWorld" style="font-size:.74rem"><button class="btn ghost sm" id="dbB" style="margin-top:4px">Use this</button> <button class="btn sm" id="dbF" style="margin-top:4px">Browse …</button>'+(s.loaded?'<p class="mut" style="margin:6px 0 0;font-size:.74rem">'+s.players.toLocaleString()+' players loaded.</p>':'<p class="msg err" style="margin-top:6px">'+(s.dbpath?'No Player.bin found there.':'Enter the path of your Player.bin first.')+'</p>')+'</div>'
    +'<div style="margin-top:8px"><span class="mut">Values are as of</span> <b>'+s.base+'</b><br><span class="mut">Write date</span> <input type="date" id="dt" value="'+E(s.date||'2026-09-01')+'" style="width:auto;display:inline-block;padding:3px 6px"><br>'+(s.months?'<span class="chip y">development '+SD(s.months)+' months</span>':'<span class="chip">no development</span>')+'</div>';
+  $('#dbF').onclick=()=>pickDb(s.dbpath);
   const b=$('#dbB');if(b)b.onclick=async()=>{const r=await api('/api/settings',{dbpath:$('#dbp').value.trim()});if(r.ok===false){alert(r.msg);return}location.reload()};
   const d=$('#dt');if(d)d.onchange=async()=>{await api('/api/settings',{date:d.value});stLoad();if(CLUB)openClub(CLUB.tid)}}
+async function pickDb(start){const d=$('#dl');d.classList.add('on');let cur=start||'';
+  const go=async p=>{const r=await api('/api/fs?path='+encodeURIComponent(p||''));if(r.ok===false){$('#dli').innerHTML='<div class="msg err">'+E(r.msg)+'</div><div class="foot" style="position:static"><button class="btn ghost" id="bC">Close</button></div>';$('#bC').onclick=()=>d.classList.remove('on');return}
+    cur=r.path;
+    $('#dli').innerHTML='<h2 style="font-size:1.4rem;text-transform:none;color:var(--text)">Choose the folder with Player.bin</h2>'
+     +'<div style="display:flex;gap:6px;margin:8px 0"><input id="fsP" value="'+E(r.path)+'" style="flex:1"><button class="btn ghost sm" id="fsG">Go</button><button class="btn ghost sm" id="fsH">Home</button><button class="btn ghost sm" id="fsR">Drives</button></div>'
+     +(r.found?'<div class="msg ok" style="margin:0 0 8px">Player.bin found: '+E(r.found)+'</div>':(r.path?'<p class="mut" style="margin:0 0 8px">No Player.bin here or in the usual sub folders. Open the folders below until it says Player.bin found.</p>':''))
+     +'<div class="lst" style="max-height:48vh">'+(r.parent!==null&&r.parent!==undefined&&r.path?'<div class="fsd" data-p="'+E(r.parent||'')+'" style="cursor:pointer"><span>⬆ ..</span></div>':'')
+     +r.dirs.map(x=>'<div class="fsd" data-p="'+E(x.path)+'" style="cursor:pointer"><span>📁 '+E(x.name)+'</span><b>'+(x.player?'Player.bin ✓':'')+'</b></div>').join('')+(r.dirs.length?'':'<div class="mut">No sub folders.</div>')+'</div>'
+     +'<div class="foot" style="position:static"><button class="btn ghost" id="bC">Cancel</button><button class="btn" id="fsU"'+(r.found?'':' disabled')+'>Use this folder</button></div>';
+    document.querySelectorAll('#dli .fsd').forEach(e=>e.onclick=()=>go(e.dataset.p));
+    $('#fsG').onclick=()=>go($('#fsP').value.trim());$('#fsP').onkeydown=e=>{if(e.key==='Enter')go($('#fsP').value.trim())};
+    $('#fsH').onclick=()=>go(r.home);$('#fsR').onclick=()=>go('');$('#bC').onclick=()=>d.classList.remove('on');
+    $('#fsU').onclick=async()=>{const x=await api('/api/settings',{dbpath:r.found});if(x.ok===false){alert(x.msg);return}location.reload()}};
+  go(cur)}
 let ST=null;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#dr').classList.remove('on');$('#dl').classList.remove('on')}});
 init();stLoad();
