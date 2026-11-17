@@ -184,6 +184,17 @@ PlayerBin.weak_foot_acc = lambda self, i: self.bits(i, WEAK_ACC_OFF, 2) + 1
 PlayerBin.positions = _pb_positions
 
 
+def _pb_set_positions(self, i, levels):
+    for (lo, hi), v in zip(POS_BITS, levels):
+        v = max(0, min(2, int(v)))
+        if lo is not None:
+            self.set_bits(i, lo, 1, v & 1)
+        self.set_bits(i, hi, 1, v >> 1)
+
+
+PlayerBin.set_positions = _pb_set_positions
+
+
 def verify(path, expected_ids, expected, before):
     """Reads the file again and checks that exactly the expected attributes (and names) changed. expected: {pid: {'attrs': {...}, 'names': {...}, 'prof': {height, weight, foot}}} -> list of problems"""
     pb = PlayerBin(path)

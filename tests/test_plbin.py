@@ -33,6 +33,8 @@ assert pb.skills(1) == {'Heading', 'Long Throw'} and pb.com_styles(1) == {'Speed
 assert pb.skills(0) == set() and pb.playing_style(0) == 'Balanced' and (pb.height(1), pb.weight(1)) == (195, 88)
 pb.set_skills(1, set())
 assert pb.skills(1) == set() and pb.com_styles(1) == {'Speeding Bullet'}
+pb.set_positions(1, [0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+assert pb.positions(1) == [0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and pb.positions(0) == [0] * 13 and pb.skills(1) == set()
 pb.save()
 pb2 = plbin.PlayerBin(path)   # what was written is what is read again
 assert pb2.get(1, 'Speed') == 99 and pb2.get_name(2, 'name') == 'Ben Winterburn' and pb2.changed() == []

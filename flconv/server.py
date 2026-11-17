@@ -530,6 +530,53 @@ def skillset_for(pid, row, mode):
     return out
 
 
+def values_traits_for(pid, final, mode, row=None, paste=False):
+    """players for whom EA FC has no PlayStyles (not in the data, a page that was pasted, a profile that is still empty): skills, COM styles and playing style from their values and their
+    position, and the positions they can play -> same form as skillset_for"""
+    if mode not in ('add', 'replace'):
+        return {}
+    pb = M.pb
+    i = pb.index[pid]
+    pos = pos_of(pid)
+    out = {}
+    cur_sk, cur_cm, cur_st = pb.skills(i), pb.com_styles(i), pb.playing_style(i)
+    if not cur_sk and not cur_cm or paste:   # a filled profile (from the game) is kept as it is; an empty one (or a pasted page) is filled from the values
+        t = playstyle.traits_from_values(final, pos)
+        if t['skills']:
+            out['skills'] = dict(cur=sorted(cur_sk), new=sorted(t['skills']), add=sorted(t['skills']), rem=[])
+        if t['com']:
+            out['com_styles'] = dict(cur=sorted(cur_cm), new=sorted(t['com']), add=sorted(t['com']), rem=[])
+        if t['style'] and (cur_st == 'Balanced' or paste):
+            out['playing_style'] = dict(cur=cur_st, new=t['style'])
+    return out
+
+
+def unfilled(pid):
+    """a profile that nobody has filled yet (no skills, no COM style, playing style 'Balanced'): a player that is new in the game"""
+    pb = M.pb
+    i = pb.index[pid]
+    return not pb.skills(i) and not pb.com_styles(i) and pb.playing_style(i) == 'Balanced'
+
+
+def positions_for(pid, final, row=None, paste=False):
+    """positions that the values make safe, added to the ones the player has (never lowered) -> {'cur', 'new', 'add'} or None. For a player of the EA FC data only the alternative
+    positions of EA FC count (confirmed by the values); a player with an empty profile or a pasted page gets them from the values and his position."""
+    pb = M.pb
+    i = pb.index[pid]
+    cur = pb.positions(i)
+    alt = [a for a in (row['alt'] if row else []) if a]
+    if alt:
+        prop = playstyle.positions_from_values(final, pos_of(pid), alt, only_alt=True)
+    elif paste or unfilled(pid):
+        prop = playstyle.positions_from_values(final, pos_of(pid))
+    else:
+        return None
+    new = [max(a, b) for a, b in zip(cur, prop)]
+    if new == cur:
+        return None
+    return dict(cur=cur, new=new, add=[dbmeta.POS_NAMES[k] for k in range(13) if new[k] > cur[k]])
+
+
 def ea_names(row):
     """names of the EA FC player: with a common name (Vini Jr.) it is name and shirt name, otherwise first + last name and the surname on the shirt"""
     r = row['raw']
@@ -683,7 +730,13 @@ def preview(body):
         if row and not fm:
             p['names_ea'] = ea_names(row)
         p['profile'] = profile_for(pid, row if not fm else None, body.get('pedits'))
-        p['skillset'] = skillset_for(pid, row if not fm else None, body.get('skills', 'off'))
+        mode = body.get('skills', 'off')
+        has_ps = bool(row and not fm and playstyle.parse(row['raw'].get('playstyles')))
+        p['skillset'] = skillset_for(pid, row if not fm else None, mode) if has_ps else values_traits_for(pid, p['final'], mode, row, paste=bool(fm))
+        if mode in ('add', 'replace'):
+            pz = positions_for(pid, p['final'], row if not fm else None, paste=bool(fm))
+            if pz:
+                p['skillset']['positions'] = pz
         p['pos_ovr'] = {k: int(round(convert.ovr_model(p['final'], k))) for k in range(13)}
         p['positions'] = M.pb.positions(i)
         p['pos_main'] = pos_of(pid)
@@ -825,6 +878,14 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                 if p['final'] == cur:
                     cnt['already'] += 1
                     continue
+                if skills != 'off':   # players that are not in the EA FC data: skills, playing style and positions from their values and position
+                    tr = values_traits_for(pid, p['final'], skills)
+                    pz = positions_for(pid, p['final'], None)
+                    if pz:
+                        tr['positions'] = pz
+                    if tr:
+                        profs.setdefault(pid, {}).update({k: v['new'] for k, v in tr.items()})
+                        cnt['skills'] += 1
                 writes[pid], srcs[pid] = p['final'], 'scaled'
                 chg_s.append(p['ovr_new'] - p['ovr_cur'])
                 cnt['scaled'] += 1

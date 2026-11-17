@@ -70,3 +70,14 @@ PlayStyles without a real skill in PES (Slide Tackle, Jockey, Block, Anticipate,
 | Mazing Run | Technical | yes | 0.85 |
 | Speeding Bullet | Quick Step, Rapid | yes | 0.86 |
 | Trickster | Trickster | yes | 0.88 |
+
+## Players without EA FC PlayStyles (not in the EA data, pasted pages, empty profiles)
+
+Here nothing in EA FC can confirm a skill, so the player's **own values and position** decide, with models fitted on all players of the game (`tools/fit_pes_traits.py`, the profile of every skill: [PES_TRAITS_PROFILE.md](PES_TRAITS_PROFILE.md)):
+
+* a **skill or COM style** is given when the model is at least 50 % sure; the models see the 25 attributes and the position;
+* a **playing style** only for the position groups where the values tell more than the position alone (defenders, midfield, attacking midfield and wingers, forwards), and only when the model is at least 50 % sure;
+* only for players with an **empty profile** (no skills, no COM style, playing style *Balanced*) and for **pasted pages**; a profile that the game has filled is kept as it is;
+* the **positions** the same way ([POSITIONS.md](POSITIONS.md)).
+
+Check on the players of the game with their original values: 51 % of the skills the models give are in the game for the same player, 75 % of the playing styles are right.
