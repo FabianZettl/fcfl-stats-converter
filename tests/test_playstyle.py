@@ -13,3 +13,13 @@ d2 = P.derive(P.parse('Precision Header|Long Throw|Trickster'), 8, None, 3)
 assert d2['direct'] == {'Heading', 'Long Throw'} and d2['direct_com'] == {'Trickster'}
 assert not P.derive(P.parse('Technical'), 8, None, 3)['direct']
 print('ok')
+
+
+def _test_cap():
+    r = lambda n: {'c': 1, 'd': 3, 'e': 2}.get(n, 0)
+    assert P.cap({'a', 'b'}, {'c', 'd', 'e'}, 'add', 3, r) == {'a', 'b', 'd'}
+    assert P.cap({'a', 'b'}, {'c', 'd', 'e'}, 'replace', 2, r) == {'d', 'e'}
+    assert len(P.cap(set(), {str(k) for k in range(20)}, 'replace', P.MAX_SKILLS, lambda n: int(n))) == 10
+
+
+_test_cap()

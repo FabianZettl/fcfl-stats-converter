@@ -621,8 +621,9 @@ def skillset_for(pid, row, mode):
     if d['style'] and not playstyle.style_fits(d['style'], row['raw'], pos_of(pid)):
         d['style'] = None
     out = {}
-    for key, cur, want in (('skills', pb.skills(i), d['skills']), ('com_styles', pb.com_styles(i), d['com'])):
-        new = (cur | want) if mode == 'add' else set(want)
+    mg = playstyle.margins(row['raw'], pos_of(pid))
+    for key, cur, want, lim, dr in (('skills', pb.skills(i), d['skills'], playstyle.MAX_SKILLS, d['direct']), ('com_styles', pb.com_styles(i), d['com'], playstyle.MAX_COM, d['direct_com'])):
+        new = playstyle.cap(cur, want, mode, lim, lambda n: (n in dr) * 100 + mg.get(n, 0))   # at most 10 skills / 5 COM styles
         if new != cur:
             out[key] = dict(cur=sorted(cur), new=sorted(new), add=sorted(new - cur), rem=sorted(cur - new))
     cs = pb.playing_style(i)
@@ -643,6 +644,9 @@ def values_traits_for(pid, final, mode, row=None, paste=False):
     cur_sk, cur_cm, cur_st = pb.skills(i), pb.com_styles(i), pb.playing_style(i)
     if not cur_sk and not cur_cm or paste:   # a filled profile (from the game) is kept as it is; an empty one (or a pasted page) is filled from the values
         t = playstyle.traits_from_values(final, pos)
+        rk = lambda n: t.get('margin', {}).get(n, 0)
+        t['skills'] = playstyle.cap(set(), t['skills'], 'replace', playstyle.MAX_SKILLS, rk)   # at most 10 skills / 5 COM styles
+        t['com'] = playstyle.cap(set(), t['com'], 'replace', playstyle.MAX_COM, rk)
         if t['skills']:
             out['skills'] = dict(cur=sorted(cur_sk), new=sorted(t['skills']), add=sorted(t['skills']), rem=[])
         if t['com']:

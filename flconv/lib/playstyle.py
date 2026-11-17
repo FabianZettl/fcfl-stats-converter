@@ -90,6 +90,20 @@ def values_fit(raw, pos):
     return sk, cm
 
 
+def margins(raw, pos):
+    """how far above the safe bar the values put each skill / COM style: {name: score - thr_hi}; used to choose when a player may only have 10 skills"""
+    m = _model()
+    if not m:
+        return {}
+    gk = pos == 0
+    try:
+        x = [float(raw[c]) for c in (m['gk_attrs'] if gk else m['attrs'])]
+    except (KeyError, TypeError, ValueError):
+        return {}
+    grp = list((m['gk_skills'] if gk else m['skills']).items()) + ([] if gk else list(m['com'].items()))
+    return {n: _score(v, x) - v['thr_hi'] for n, v in grp if 'thr_hi' in v}
+
+
 def style_fits(style, raw, pos):
     """does the playing style fit the values? Only styles that the values tell apart (AUC >= STYLE_MIN_AUC) are given at all"""
     v = (_model().get('styles') or {}).get(style)
@@ -126,10 +140,11 @@ def traits_from_values(attrs, pos):
     x = [float(attrs[a]) for a in AB]
     if pos == 0:
         sk = {n for n, v in m['gk_skills'].items() if 'thr_hi' in v and sum(w * a for w, a in zip(v['w'], x)) + v['b'] >= v['thr_hi']}
-        return dict(skills=sk, com=set(), style=None)
+        return dict(skills=sk, com=set(), style=None, margin={n: sum(w * a for w, a in zip(v['w'], x)) + v['b'] - v['thr_hi'] for n, v in m['gk_skills'].items() if 'thr_hi' in v})
     xf = x + [1.0 if pos == k else 0.0 for k in range(13)]
-    sk = {n for n, v in m['skills'].items() if 'thr_hi' in v and sum(w * a for w, a in zip(v['w'], xf)) + v['b'] >= v['thr_hi']}
-    cm = {n for n, v in m['com'].items() if 'thr_hi' in v and sum(w * a for w, a in zip(v['w'], xf)) + v['b'] >= v['thr_hi']}
+    mg = {n: sum(w * a for w, a in zip(v['w'], xf)) + v['b'] - v['thr_hi'] for n, v in list(m['skills'].items()) + list(m['com'].items()) if 'thr_hi' in v}
+    sk = {n for n in m['skills'] if mg.get(n, -1) >= 0}
+    cm = {n for n in m['com'] if mg.get(n, -1) >= 0}
     style = None
     for g, ps in m['style_groups'].items():
         v = m['styles'].get(g)
@@ -141,7 +156,7 @@ def traits_from_values(attrs, pos):
             k = max(range(len(P)), key=lambda q: P[q])
             if P[k] / t >= 0.5:
                 style = m['style_names'][k]
-    return dict(skills=sk, com=cm, style=style)
+    return dict(skills=sk, com=cm, style=style, margin=mg)
 
 
 _PNAMES = ['GK', 'CB', 'LB', 'RB', 'DMF', 'CMF', 'LMF', 'RMF', 'AMF', 'LWF', 'RWF', 'SS', 'CF']
@@ -173,3 +188,14 @@ def positions_from_values(attrs, main, ea_alt=(), only_alt=False):
             if n and 'thr_hi' in n and sum(w * a for w, a in zip(n['w'], xf)) + n['b'] >= n['thr_hi']:
                 lv[p] = 2
     return lv
+
+
+MAX_SKILLS, MAX_COM = 10, 5   # what a player can have in the game (COM styles: the limit of the PES editor, not tested here)
+
+
+def cap(cur, want, mode, limit, rank):
+    """the skills (or COM styles) a player gets when he may only have `limit`: 'add' keeps what he has (as far as it fits) and fills up with the best of the wanted ones; 'replace' takes the best of
+    the wanted ones. rank(name) -> bigger = more important (PlayStyle that is the skill itself first, then how far the values are above the safe bar)"""
+    best = sorted(want, key=lambda n: (-rank(n), n))
+    keep = sorted(cur, key=lambda n: (-rank(n), n))[:limit] if mode == 'add' else []
+    return set(keep) | set([n for n in best if n not in keep][:max(0, limit - len(keep))])
