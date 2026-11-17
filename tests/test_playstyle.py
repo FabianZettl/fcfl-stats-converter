@@ -8,5 +8,8 @@ assert {'Long Range Drive', 'Acrobatic Finishing', 'Scissors Feint'} <= d['skill
 assert d['com'] == {'Speeding Bullet', 'Mazing Run'} and d['style'] == 'Prolific Winger'
 assert P.derive(ps, 9, dict(penalties=60), 5) == d   # the same every time
 assert P.derive(P.parse('Dead Ball'), 5, dict(penalties=70), 1)['skills'] == set() and P.derive(P.parse('Dead Ball'), 5, dict(penalties=80), 1)['skills'] == {'Penalty Specialist'}
-assert P.derive({}, 12, None, 0) == dict(skills=set(), com=set(), style=None)
+assert P.derive({}, 12, None, 0) == dict(skills=set(), com=set(), style=None, direct=set(), direct_com=set())
+d2 = P.derive(P.parse('Precision Header|Long Throw|Trickster'), 8, None, 3)
+assert d2['direct'] == {'Heading', 'Long Throw'} and d2['direct_com'] == {'Trickster'}
+assert not P.derive(P.parse('Technical'), 8, None, 3)['direct']
 print('ok')

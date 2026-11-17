@@ -4,10 +4,16 @@
   "Acrobatic": {
    "skills": [
     "Acrobatic Finishing"
+   ],
+   "direct": [
+    "Acrobatic Finishing"
    ]
   },
   "Chip Shot": {
    "skills": [
+    "Chip Shot Control"
+   ],
+   "direct": [
     "Chip Shot Control"
    ]
   },
@@ -45,10 +51,16 @@
   "Precision Header": {
    "skills": [
     "Heading"
+   ],
+   "direct": [
+    "Heading"
    ]
   },
   "Incisive Pass": {
    "skills": [
+    "Through Passing"
+   ],
+   "direct": [
     "Through Passing"
    ]
   },
@@ -85,6 +97,9 @@
    ],
    "com": [
     "Early Cross"
+   ],
+   "direct": [
+    "Pinpoint Crossing"
    ]
   },
   "First Touch": {
@@ -122,6 +137,9 @@
    ],
    "com": [
     "Trickster"
+   ],
+   "direct_com": [
+    "Trickster"
    ]
   },
   "Aerial Fortress": {
@@ -143,6 +161,9 @@
   "Intercept": {
    "skills": [
     "Interception"
+   ],
+   "direct": [
+    "Interception"
    ]
   },
   "Jockey": {
@@ -163,6 +184,9 @@
   "Long Throw": {
    "skills": [
     "Long Throw"
+   ],
+   "direct": [
+    "Long Throw"
    ]
   },
   "Quick Step": {
@@ -179,6 +203,9 @@
    "skills": [
     "GK Long Throw",
     "GK Low Punt"
+   ],
+   "direct": [
+    "GK Long Throw"
    ]
   }
  },
@@ -661,5 +688,6 @@
    ],
    "mode": "plus"
   }
- }
+ },
+ "_doc2": "'direct' / 'direct_com': the PlayStyle IS this skill (the same ability): given on the PlayStyle alone. All other skills of a PlayStyle need the values to make them safe as well (docs/SKILL_TRANSLATION.md)."
 }

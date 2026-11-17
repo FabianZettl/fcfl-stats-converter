@@ -6,7 +6,7 @@ A skill or COM playing style is **only given when both are true**:
 1. **EA FC has the matching PlayStyle** for the player (mapping in [PLAYSTYLE_MAPPING.md](PLAYSTYLE_MAPPING.md), section 1), and
 2. **the EA FC values make the skill safe for this player**: a model per skill, fitted on the 14,913 players that are in the game and in the EA data (`tools/fit_skills.py`), must make it at least 50 % sure (cross-validated).
 
-So a PlayStyle alone never gives a skill (a Precision Header with a heading value of 75 does not get *Heading*), and good values alone do not give a skill that EA FC does not have. Nothing is ever removed in mode *add*.
+**Exception: the PlayStyle that IS the skill** (the same ability) is given on its own: Precision Header → Heading, Long Throw → Long Throw, Chip Shot → Chip Shot Control, Acrobatic → Acrobatic Finishing, Intercept → Interception, Whipped Pass → Pinpoint Crossing, Incisive Pass → Through Passing, Far Throw → GK Long Throw, Trickster → COM Trickster (`direct` in `flconv/data/playstyle_map.json`). For all other skills a PlayStyle alone is not enough, and good values alone do not give a skill that EA FC does not have. Nothing is ever removed in mode *add*.
 
 **Measured:** over the 9,482 players that have PlayStyle data, 62 % of the skills given this way are also in the game for the same player today (the bar "PlayStyle only": 15 to 40 % depending on the skill). The rest is not "wrong", EA PlayStyles and Konami skills are two independent designs; it shows why the safe bar is used.
 

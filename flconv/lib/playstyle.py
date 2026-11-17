@@ -19,7 +19,7 @@ def parse(text):
 
 def derive(styles, pos, raw=None, pid=0):
     """-> dict(skills, com, style): what the PlayStyles of EA FC (dict from parse) give; style None = no rule applies (keep the current one)"""
-    skills, com = set(), set()
+    skills, com, direct, direct_com = set(), set(), set(), set()
     for st, plus in styles.items():
         m = MAP['skills'].get(st)
         if not m:
@@ -28,6 +28,8 @@ def derive(styles, pos, raw=None, pid=0):
             continue
         skills.update(m.get('skills') or [])
         com.update(m.get('com') or [])
+        direct.update(m.get('direct') or [])
+        direct_com.update(m.get('direct_com') or [])
         if plus:
             skills.update(m.get('plus') or [])
         if m.get('one_of'):   # one of several: the same one for the same player every time
@@ -37,7 +39,7 @@ def derive(styles, pos, raw=None, pid=0):
         if pos in r['pos'] and sum(1 for n in r['need'] if n in styles) >= r['min']:
             style = r['style']
             break
-    return dict(skills=skills, com=com, style=style)
+    return dict(skills=skills, com=com, style=style, direct=direct & skills, direct_com=direct_com & com)
 
 
 def boosts(styles):

@@ -495,8 +495,8 @@ def skillset_for(pid, row, mode):
         pen = None
     d = playstyle.derive(ps, pos_of(pid), dict(penalties=pen), pid)
     vs, vc = playstyle.values_fit(row['raw'], pos_of(pid))   # a skill needs the EA PlayStyle AND values that fit
-    d['skills'] &= vs
-    d['com'] &= vc
+    d['skills'] = (d['skills'] & vs) | d['direct']   # the PlayStyle that IS the skill (Precision Header = Heading) needs no test of the values
+    d['com'] = (d['com'] & vc) | d['direct_com']
     if d['style'] and not playstyle.style_fits(d['style'], row['raw'], pos_of(pid)):
         d['style'] = None
     out = {}
