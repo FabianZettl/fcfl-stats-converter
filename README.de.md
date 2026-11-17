@@ -15,6 +15,7 @@ Du gibst den Pfad zu deiner `Player.bin` an, das Tool vergleicht deine Datenbank
 * **Manuelle Anpassungen** – gewünschtes Overall eines Spielers einstellen (die Attribute werden angepasst), einzelne Attribute, Namen und Trikotnamen ändern.
 * **Größe, Gewicht und starker Fuß** des EA-Eintrags werden mitgeschrieben (Schalter in der Seitenleiste), mit Icons in der Profil-Karte des Spielers, eigene Werte sind möglich.
 * **Schreiben in eine laufende Master League** (optional, braucht **Gaffer**): die 25 Attribute gehen über die Bridge von Gaffer ins Spiel, in Paketen mit Fortschrittsbalken (siehe englische README).
+* **Suche** nach Spielern und Teams in der Seitenleiste (ohne Umweg über das Liga-Menü).
 * Ordnerauswahl, Backups mit Wiederherstellung per Klick, bereits konvertierte Spieler werden markiert und übersprungen.
 
 **Geplant:** Positionen, Fähigkeiten, Spielstile und mehr.

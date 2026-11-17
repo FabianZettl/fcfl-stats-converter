@@ -484,6 +484,29 @@ def missing(cid=None, limit=500):
     return dict(ok=True, total=len(out), of=len(pids), players=out[:limit])
 
 
+FIND = dict(key=None, teams=[], players=[])
+
+
+def find(q, limit=12):
+    """search of the page: teams and players by name (every word has to appear), best first"""
+    words = fcdb.fold(q).split()
+    if not words or M is None:
+        return dict(ok=True, teams=[], players=[])
+    if FIND['key'] is not M:   # built once per loaded database
+        FIND.update(key=M, teams=[(fcdb.fold(n), tid) for tid, n in M.team.items() if tid in M.league_of],
+                    players=[(pid, fcdb.fold(M.name.get(pid, '') + ' ' + M.short.get(pid, ''))) for pid in M.pb.ids])
+    def rank(blob, first):
+        return 0 if blob.startswith(words[0]) else (1 if (' ' + words[0]) in (' ' + blob) else 2)
+    teams = sorted(((rank(b, 0), M.team[t], t) for b, t in FIND['teams'] if all(w in b for w in words)), key=lambda x: (x[0], x[1]))[:limit]
+    hits = [pid for pid, b in FIND['players'] if all(w in b for w in words)]
+    hits.sort(key=lambda p: rank(fcdb.fold(M.name.get(p, '')), 0))
+    top = hits[:400]   # the overall is only computed for the best matches
+    top.sort(key=lambda p: (rank(fcdb.fold(M.name.get(p, '')), 0), -cur_ovr(p)))
+    hits = top + hits[400:]
+    pl = [dict(pid=p, name=M.name.get(p) or ('Player %d' % p), club=club_name(p), pos=dbmeta.POS_NAMES[pos_of(p)] if pos_of(p) < 13 else '?', age=M.age.get(p), ovr=cur_ovr(p)) for p in hits[:limit]]
+    return dict(ok=True, teams=[dict(tid=t, name=n, league=(M.leagues.get(M.league_of.get(t)) or {}).get('name'), lid=M.league_of.get(t)) for _, n, t in teams], players=pl, more=max(0, len(hits) - limit))
+
+
 def club_view(tid, youth=True):
     pids = squad_of(tid)
     pl = [pl_row(p, youth) for p in pids]
@@ -1055,6 +1078,8 @@ class H(BaseHTTPRequestHandler):
                                     leagues=[dict(id=c, name=L['name'], n=len(L['teams'])) for c, L in sorted(M.leagues.items(), key=lambda kv: kv[1]['name'])] if M else [], backups=backups()))
             elif u.path == '/api/fs':
                 self.send_json(fs_list((q.get('path') or [''])[0], (q.get('kind') or [''])[0]))
+            elif u.path == '/api/find':
+                self.send_json(find((q.get('q') or [''])[0]))
             elif u.path == '/api/league':
                 self.send_json(league_view(int(q['id'][0])))
             elif u.path == '/api/missing':

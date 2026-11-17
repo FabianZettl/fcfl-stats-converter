@@ -41,6 +41,7 @@ select,input,textarea{background:#0b1225;color:var(--text);border:1px solid var(
   <div class="brand"><div class="logo" style="font-size:.78rem;letter-spacing:-.5px">FCFL</div><div><b>FCFL - STATS CONVERTER</b><small>EA FC → Player.bin</small></div></div>
   <div id="info" class="mut" style="font-size:.8rem"></div>
   <div class="box" id="st" style="font-size:.82rem"></div>
+  <div style="position:relative"><input id="gs" type="search" placeholder="Search player or team …" autocomplete="off" style="width:100%"><div id="gsr" style="display:none;position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:60vh;overflow:auto;box-shadow:0 10px 30px #0008"></div></div>
   <select id="lg"></select>
   <div id="clubs" class="clubs"></div>
   <div style="margin-top:auto;display:grid;gap:6px"><label style="display:flex;gap:8px;align-items:center;font-size:.82rem" title="Young players whose potential is far above their rating get +1 to +3 overall in advance (age up to 22): they are closer to their potential, the development in a career has less to catch up."><input type="checkbox" id="yb" checked style="width:auto"> Youth bonus (+0 to +3)</label><label style="display:flex;gap:8px;align-items:center;font-size:.82rem" title="Also write height, weight and preferred foot of the EA FC entry into Player.bin (only where the data has a value)"><input type="checkbox" id="pf" checked style="width:auto"> Height, weight and foot</label><button class="btn sm" id="allB2">Convert the whole database …</button><button class="btn ghost sm" id="misB2">Not found in the database …</button><button class="btn ghost sm" id="fmcB">FM calibration …</button><button class="btn ghost sm" id="bkB">Backups …</button></div>
@@ -66,6 +67,18 @@ const profBox=r=>{const P=r.profile||{};const k=['height','weight','foot'].filte
       +(chg&&f!=='foot'?'<span class="pd '+(d>0?'up':'dn')+'">('+SD(d)+')</span>':'')+'</div><small>'+(x.src==='you'?'your value':'EA FC')+'</small></div></div>'}).join('')+'</div></div>'};
 const pedits=()=>{const o={};document.querySelectorAll('.pt').forEach(t=>{const v=t.querySelector('.pe').value;if(v!==''&&String(v)!==t.dataset.n)o[t.dataset.f]=v});return o};
 let LG=[],CUR=null,CLUB=null,PID=null,CH={};
+let GST=0;
+$('#gs').addEventListener('input',()=>{const q=$('#gs').value.trim(),box=$('#gsr'),my=++GST;if(q.length<2){box.style.display='none';return}
+  setTimeout(async()=>{if(my!==GST)return;const r=await api('/api/find?q='+encodeURIComponent(q));if(my!==GST)return;
+    const row=(c,a,t,s)=>'<div class="gsi" '+a+' style="display:flex;justify-content:space-between;gap:8px;padding:7px 10px;cursor:pointer"><span>'+t+'</span><small class="mut">'+s+'</small></div>';
+    box.innerHTML=(r.teams.length?'<div class="mut" style="padding:6px 10px 2px;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase">Teams</div>'+r.teams.map(t=>row('','data-t="'+t.tid+'" data-l="'+t.lid+'"','🏟 '+E(t.name),E(t.league||'')).replace('class="gsi"','class="gsi"')).join(''):'')
+      +(r.players.length?'<div class="mut" style="padding:6px 10px 2px;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase">Players</div>'+r.players.map(p=>row('','data-p="'+p.pid+'"','<b>'+E(p.name)+'</b> <small class="mut">'+E(p.pos)+' · '+(p.age||'?')+' y</small>',E(p.club||'no club')+' · <b>'+p.ovr+'</b>')).join('')+(r.more?'<div class="mut" style="padding:6px 10px;font-size:.74rem">… '+r.more+' more: type more of the name</div>':''):'')
+      ||'<div class="mut" style="padding:10px">Nothing found.</div>';
+    box.style.display='block'},180)});
+$('#gsr').addEventListener('click',async e=>{const i=e.target.closest('.gsi');if(!i)return;$('#gsr').style.display='none';
+  if(i.dataset.t){const lg=$('#lg');if(lg.value!==i.dataset.l){lg.value=i.dataset.l;lg.dispatchEvent(new Event('change'));await new Promise(r=>{const t=setInterval(()=>{if(document.querySelector('.cl')){clearInterval(t);r()}},100)})}openClub(+i.dataset.t)}
+  else if(i.dataset.p)openPlayer(+i.dataset.p)});
+document.addEventListener('click',e=>{if(!e.target.closest('#gs,#gsr'))$('#gsr').style.display='none'});
 async function init(){const r=await api('/api/init');LG=r.leagues;$('#info').innerHTML=r.players.toLocaleString()+' players in the database<br>'+r.ea.toLocaleString()+' players in '+E(r.csv);
   $('#lg').innerHTML='<option value="">Choose a league …</option>'+LG.map(l=>'<option value="'+l.id+'">'+E(l.name)+' ('+l.n+')</option>').join('');}
 $('#lg').onchange=async e=>{if(!e.target.value)return;$('#clubs').innerHTML='<p class="mut">Searching the database …</p>';CUR=await api('/api/league?id='+e.target.value);

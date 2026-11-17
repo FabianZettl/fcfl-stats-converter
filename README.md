@@ -17,6 +17,7 @@ shows what would change (every attribute, old → new, with the reason) and offe
 * **Manual adjustments** – set the overall you want for a player (the attributes are moved to match), change single attributes, change names and shirt names.
 * **Height, weight and preferred foot** of the EA FC entry are written with the stats (switch in the sidebar), each with an icon in the profile card of the player, and you can type your own values.
 * **Writing into a running Master League** (optional, needs **Gaffer**): the 25 attributes are sent to the game through Gaffer's bridge, in packages with a progress bar. See below.
+* **Search** for players and teams in the sidebar (no need to go through the league menu): type two letters, click a team to open it, a player to open him.
 * Folder picker, backups with one-click restore, players that are already converted are marked and skipped.
 
 **Planned:** positions, skills, play styles and more.
