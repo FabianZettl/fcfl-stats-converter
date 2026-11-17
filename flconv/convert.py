@@ -29,12 +29,12 @@ def ovr_model(att, pos):
     return sum(w[i] * att[a] for i, a in enumerate(AB)) + w[25]
 
 
-def fit_overall(stats, pos, target, cap=FIT_CAP):
+def fit_overall(stats, pos, target, cap=FIT_CAP, lock=()):
     """round robin over the attributes that count for the position (most important first) until the overall of the model is the target -> (new stats, changes)"""
     w = wvec(pos)
     tw = sum(x for x in w[:25] if x > 0) or 1.0
     out = dict(stats)
-    order = sorted((a for i, a in enumerate(AB) if w[i] > 0), key=lambda a: -w[AB.index(a)])
+    order = sorted((a for i, a in enumerate(AB) if w[i] > 0 and a not in lock), key=lambda a: -w[AB.index(a)])   # lock: attributes that must stay (PlayStyle bonuses)
     est = ovr_model(out, pos)
     sg = 1 if target > est else -1
     ch = {a: 0 for a in AB}
@@ -117,7 +117,7 @@ def finish(fitted, pos, age, rating, months, pid, edits):
     return sh
 
 
-def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_calib=None, cur=None, months=0, age=None, pid=None, edits=None):
+def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_calib=None, cur=None, months=0, age=None, pid=None, edits=None, boost=None):
     """-> dict(ok, rows, steps, ...) for the record i of Player.bin; cur: current values (default: Player.bin), months: development to the date of the write"""
     gk = pos == 0
     cur = cur or pb.attrs(i)
@@ -175,15 +175,17 @@ def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_cali
             v = v2
         e = ex.get(a) or {}
         sc[a] = max(40, min(99, v0 + pcd))
-        fin0[a] = v
+        bo = (boost or {}).get(a, 0)
+        fin0[a] = min(99, v + bo) if bo else v   # bonus of the PlayStyles: the overall is fitted afterwards, the other attributes give way
         rows.append(dict(attr=a, cur=cur[a], sofifa=v0, pc=pcd, pb=pbd, conv=v, base=e.get('base'), adj=(v0 - e['base']) if e.get('base') is not None else None,
                          src=e.get('src'), rule=e.get('rule'), model=bool(e.get('model'))))
     tgt = target if target is not None else src_ovr
-    fitted0, ch = (fit_overall(fin0, pos, tgt) if tgt is not None else (fin0, {a: 0 for a in AB}))
+    fitted0, ch = (fit_overall(fin0, pos, tgt, lock=set(boost or ())) if tgt is not None else (fin0, {a: 0 for a in AB}))
     fitted = finish(fitted0, pos, age, tgt if tgt is not None else ovr_model(fitted0, pos), months, pid or 0, edits)
     w = wvec(pos)
     for r in rows:
         r['fit'] = ch[r['attr']]
+        r['ps'] = (boost or {}).get(r['attr'], 0)
         r['ts'] = fitted[r['attr']] - fitted0[r['attr']]
         r['edited'] = bool(edits and edits.get(r['attr']) not in (None, '')) 
         r['final'] = fitted[r['attr']]

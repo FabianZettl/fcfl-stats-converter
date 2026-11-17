@@ -1,0 +1,426 @@
+{
+ "Scissors Feint": {
+  "covered": 9482,
+  "rate": 0.062,
+  "mapped": [
+   "Technical"
+  ],
+  "map_precision": 0.182,
+  "map_recall": 0.25,
+  "both_precision": 0.2,
+  "both_recall": 0.596
+ },
+ "Flip Flap": {
+  "covered": 9482,
+  "rate": 0.018,
+  "mapped": [
+   "Trickster"
+  ],
+  "map_precision": 0.111,
+  "map_recall": 0.04,
+  "both_precision": 0.162,
+  "both_recall": 0.257
+ },
+ "Marseille Turn": {
+  "covered": 9482,
+  "rate": 0.038,
+  "mapped": [
+   "Technical"
+  ],
+  "map_precision": 0.122,
+  "map_recall": 0.275,
+  "both_precision": 0.132,
+  "both_recall": 0.419
+ },
+ "Sombrero": {
+  "covered": 9482,
+  "rate": 0.02,
+  "mapped": [
+   "Trickster"
+  ],
+  "map_precision": 0.143,
+  "map_recall": 0.046,
+  "both_precision": 0.165,
+  "both_recall": 0.237
+ },
+ "Cut Behind & Turn": {
+  "covered": 9482,
+  "rate": 0.146,
+  "mapped": []
+ },
+ "Scotch Move": {
+  "covered": 9482,
+  "rate": 0.028,
+  "mapped": [
+   "Trickster"
+  ],
+  "map_precision": 0.175,
+  "map_recall": 0.041,
+  "both_precision": 0.159,
+  "both_recall": 0.415
+ },
+ "Heading": {
+  "covered": 9482,
+  "rate": 0.186,
+  "mapped": [
+   "Aerial Fortress",
+   "Precision Header"
+  ],
+  "map_precision": 0.491,
+  "map_recall": 0.295,
+  "both_precision": 0.499,
+  "both_recall": 0.811
+ },
+ "Long Range Drive": {
+  "covered": 9482,
+  "rate": 0.097,
+  "mapped": [
+   "Finesse Shot"
+  ],
+  "map_precision": 0.354,
+  "map_recall": 0.167,
+  "both_precision": 0.321,
+  "both_recall": 0.619
+ },
+ "Acrobatic Finishing": {
+  "covered": 9482,
+  "rate": 0.103,
+  "mapped": [
+   "Acrobatic"
+  ],
+  "map_precision": 0.514,
+  "map_recall": 0.039,
+  "both_precision": 0.365,
+  "both_recall": 0.594
+ },
+ "Heel Trick": {
+  "covered": 9482,
+  "rate": 0.051,
+  "mapped": [
+   "Tiki Taka"
+  ],
+  "map_precision": 0.108,
+  "map_recall": 0.021,
+  "both_precision": 0.211,
+  "both_recall": 0.445
+ },
+ "First-time Shot": {
+  "covered": 9482,
+  "rate": 0.154,
+  "mapped": [
+   "Low Driven Shot"
+  ],
+  "map_precision": 0.451,
+  "map_recall": 0.064,
+  "both_precision": 0.566,
+  "both_recall": 0.665
+ },
+ "One-touch Pass": {
+  "covered": 9482,
+  "rate": 0.163,
+  "mapped": [
+   "Pinged Pass",
+   "Tiki Taka"
+  ],
+  "map_precision": 0.435,
+  "map_recall": 0.056,
+  "both_precision": 0.386,
+  "both_recall": 0.705
+ },
+ "Weighted Pass": {
+  "covered": 9482,
+  "rate": 0.103,
+  "mapped": [
+   "Long Ball Pass"
+  ],
+  "map_precision": 0.246,
+  "map_recall": 0.176,
+  "both_precision": 0.296,
+  "both_recall": 0.574
+ },
+ "Pinpoint Crossing": {
+  "covered": 9482,
+  "rate": 0.114,
+  "mapped": [
+   "Whipped Pass"
+  ],
+  "map_precision": 0.46,
+  "map_recall": 0.149,
+  "both_precision": 0.317,
+  "both_recall": 0.634
+ },
+ "Outside Curler": {
+  "covered": 9482,
+  "rate": 0.067,
+  "mapped": [
+   "Gamechanger",
+   "Inventive"
+  ],
+  "map_precision": 0.203,
+  "map_recall": 0.193,
+  "both_precision": 0.195,
+  "both_recall": 0.548
+ },
+ "Low Lofted Pass": {
+  "covered": 9482,
+  "rate": 0.069,
+  "mapped": [
+   "Long Ball Pass"
+  ],
+  "map_precision": 0.163,
+  "map_recall": 0.174,
+  "both_precision": 0.205,
+  "both_recall": 0.475
+ },
+ "GK Low Punt": {
+  "covered": 9482,
+  "rate": 0.001,
+  "mapped": [
+   "Far Throw"
+  ],
+  "map_precision": 0.0,
+  "map_recall": 0.0
+ },
+ "Long Throw": {
+  "covered": 9482,
+  "rate": 0.055,
+  "mapped": [
+   "Long Throw"
+  ],
+  "map_precision": 0.356,
+  "map_recall": 0.19,
+  "both_precision": 0.224,
+  "both_recall": 0.639
+ },
+ "GK Long Throw": {
+  "covered": 9482,
+  "rate": 0.001,
+  "mapped": [
+   "Far Throw"
+  ],
+  "map_precision": 0.0,
+  "map_recall": 0.0
+ },
+ "Gamesmanship": {
+  "covered": 9482,
+  "rate": 0.124,
+  "mapped": []
+ },
+ "Man Marking": {
+  "covered": 9482,
+  "rate": 0.109,
+  "mapped": [
+   "Anticipate",
+   "Jockey"
+  ],
+  "map_precision": 0.27,
+  "map_recall": 0.164,
+  "both_precision": 0.368,
+  "both_recall": 0.688
+ },
+ "Track Back": {
+  "covered": 9482,
+  "rate": 0.052,
+  "mapped": []
+ },
+ "Acrobatic Clear": {
+  "covered": 9482,
+  "rate": 0.141,
+  "mapped": [
+   "Aerial Fortress",
+   "Block"
+  ],
+  "map_precision": 0.283,
+  "map_recall": 0.208,
+  "both_precision": 0.376,
+  "both_recall": 0.655
+ },
+ "Captaincy": {
+  "covered": 9482,
+  "rate": 0.048,
+  "mapped": []
+ },
+ "Fighting Spirit": {
+  "covered": 9482,
+  "rate": 0.169,
+  "mapped": [
+   "Bruiser",
+   "Enforcer",
+   "Relentless"
+  ],
+  "map_precision": 0.314,
+  "map_recall": 0.178,
+  "both_precision": 0.321,
+  "both_recall": 0.66
+ },
+ "Penalty Specialist": {
+  "covered": 9482,
+  "rate": 0.055,
+  "mapped": [
+   "Dead Ball"
+  ],
+  "map_precision": 0.123,
+  "map_recall": 0.06,
+  "both_precision": 0.248,
+  "both_recall": 0.542
+ },
+ "Chip Shot Control": {
+  "covered": 9482,
+  "rate": 0.032,
+  "mapped": [
+   "Chip Shot"
+  ],
+  "map_precision": 0.375,
+  "map_recall": 0.1,
+  "both_precision": 0.205,
+  "both_recall": 0.419
+ },
+ "Step On Ball Control": {
+  "covered": 9482,
+  "rate": 0.141,
+  "mapped": [
+   "Press Proven"
+  ],
+  "map_precision": 0.214,
+  "map_recall": 0.052,
+  "both_precision": 0.339,
+  "both_recall": 0.591
+ },
+ "Dipping Shot": {
+  "covered": 9482,
+  "rate": 0.07,
+  "mapped": []
+ },
+ "Rising Shots": {
+  "covered": 9482,
+  "rate": 0.082,
+  "mapped": [
+   "Low Driven Shot"
+  ],
+  "map_precision": 0.17,
+  "map_recall": 0.045,
+  "both_precision": 0.21,
+  "both_recall": 0.539
+ },
+ "Interception": {
+  "covered": 9482,
+  "rate": 0.258,
+  "mapped": [
+   "Intercept"
+  ],
+  "map_precision": 0.527,
+  "map_recall": 0.117,
+  "both_precision": 0.496,
+  "both_recall": 0.848
+ },
+ "Double Touch": {
+  "covered": 9482,
+  "rate": 0.096,
+  "mapped": [
+   "First Touch"
+  ],
+  "map_precision": 0.359,
+  "map_recall": 0.092,
+  "both_precision": 0.312,
+  "both_recall": 0.648
+ },
+ "Cross Over Turn": {
+  "covered": 9482,
+  "rate": 0.056,
+  "mapped": [
+   "Technical"
+  ],
+  "map_precision": 0.136,
+  "map_recall": 0.207,
+  "both_precision": 0.165,
+  "both_recall": 0.482
+ },
+ "Long Range Shooting": {
+  "covered": 9482,
+  "rate": 0.111,
+  "mapped": [
+   "Power Shot"
+  ],
+  "map_precision": 0.486,
+  "map_recall": 0.096,
+  "both_precision": 0.317,
+  "both_recall": 0.571
+ },
+ "Through Passing": {
+  "covered": 9482,
+  "rate": 0.139,
+  "mapped": [
+   "Incisive Pass"
+  ],
+  "map_precision": 0.532,
+  "map_recall": 0.15,
+  "both_precision": 0.38,
+  "both_recall": 0.716
+ },
+ "Trickster": {
+  "covered": 9482,
+  "rate": 0.11,
+  "mapped": [
+   "Trickster"
+  ],
+  "map_precision": 0.683,
+  "map_recall": 0.041,
+  "both_precision": 0.477,
+  "both_recall": 0.643
+ },
+ "Mazing Run": {
+  "covered": 9482,
+  "rate": 0.232,
+  "mapped": [
+   "Technical"
+  ],
+  "map_precision": 0.65,
+  "map_recall": 0.237,
+  "both_precision": 0.552,
+  "both_recall": 0.735
+ },
+ "Speeding Bullet": {
+  "covered": 9482,
+  "rate": 0.218,
+  "mapped": [
+   "Quick Step",
+   "Rapid"
+  ],
+  "map_precision": 0.734,
+  "map_recall": 0.292,
+  "both_precision": 0.548,
+  "both_recall": 0.756
+ },
+ "Incisive Run": {
+  "covered": 9482,
+  "rate": 0.2,
+  "mapped": []
+ },
+ "Long Ball Expert": {
+  "covered": 9482,
+  "rate": 0.242,
+  "mapped": [
+   "Long Ball Pass"
+  ],
+  "map_precision": 0.597,
+  "map_recall": 0.182,
+  "both_precision": 0.472,
+  "both_recall": 0.814
+ },
+ "Early Cross": {
+  "covered": 9482,
+  "rate": 0.172,
+  "mapped": [
+   "Whipped Pass"
+  ],
+  "map_precision": 0.6,
+  "map_recall": 0.129,
+  "both_precision": 0.519,
+  "both_recall": 0.686
+ },
+ "Long Ranger": {
+  "covered": 9482,
+  "rate": 0.262,
+  "mapped": []
+ }
+}

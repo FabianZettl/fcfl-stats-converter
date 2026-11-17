@@ -371,7 +371,7 @@ def ahash(att):
     return hashlib.md5(bytes(att[a] for a in plbin.AB)).hexdigest()[:12]
 
 
-YF = dict(youth=True, profile=True, skills='off')   # setting of the last write (for the journal)
+YF = dict(youth=True, profile=True, skills='off', psboost=False)   # setting of the last write (for the journal)
 
 
 def sig_of(pid, src, youth):
@@ -380,7 +380,7 @@ def sig_of(pid, src, youth):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
-    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0))).encode()).hexdigest()[:10]
+    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0) + 4 * int(bool(YF.get('psboost'))))).encode()).hexdigest()[:10]
 
 
 def jentry(pid, src, att):
@@ -494,6 +494,9 @@ def skillset_for(pid, row, mode):
     except ValueError:
         pen = None
     d = playstyle.derive(ps, pos_of(pid), dict(penalties=pen), pid)
+    vs, vc = playstyle.from_values(row['raw'], pos_of(pid))   # skills the EA values alone make clear
+    d['skills'] |= vs
+    d['com'] |= vc
     out = {}
     for key, cur, want in (('skills', pb.skills(i), d['skills']), ('com_styles', pb.com_styles(i), d['com'])):
         new = (cur | want) if mode == 'add' else set(want)
@@ -635,10 +638,11 @@ def preview(body):
             yb = youth_bonus(pid, pg['overall'], pg.get('potential')) if body.get('youth', True) else 0
             target = pg['overall'] + yb
     mo = months()
+    boost = playstyle.boosts(playstyle.parse(row['raw'].get('playstyles'))) if (row and not fm and body.get('psboost')) else None
     want = body.get('target')   # a target typed by the user is the overall AFTER the development: the fit is moved by the difference (the development comes on top of the fit)
     tg = target
     for _ in range(4):
-        p = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'))
+        p = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'), boost=boost)
         if want is None or not p.get('ok') or p['ovr_new'] == int(want):
             break
         tg += int(want) - p['ovr_new']
@@ -680,6 +684,7 @@ def apply(body):
     YF['youth'] = bool(body.get('youth', True))
     YF['profile'] = bool(body.get('profile', True))
     YF['skills'] = body.get('skills', 'off')
+    YF['psboost'] = bool(body.get('psboost'))
     choices = {int(k): v for k, v in (body.get('choices') or {}).items()}
     pids = [int(p) for p in body.get('pids') or []]
     for t in body.get('tids') or []:   # whole clubs: every player that is found unambiguously
@@ -691,7 +696,7 @@ def apply(body):
             report.append(dict(pid=pid, name=M.name.get(pid), ok=False, msg='already converted', skipped=True))
             continue
         try:
-            p = preview(dict(pid=pid, db_id=ch.get('db_id'), fm=ch.get('fm'), target=ch.get('target'), edits=ch.get('edits'), pedits=ch.get('pedits'), skills=YF['skills'], youth=body.get('youth', True)))
+            p = preview(dict(pid=pid, db_id=ch.get('db_id'), fm=ch.get('fm'), target=ch.get('target'), edits=ch.get('edits'), pedits=ch.get('pedits'), skills=YF['skills'], psboost=YF['psboost'], youth=body.get('youth', True)))
         except Exception as ex:
             p = dict(ok=False, msg=str(ex))
         if not p.get('ok'):
@@ -734,13 +739,14 @@ def commit(writes, srcs, names=None, profs=None):
 JOB = dict(state='idle')
 
 
-def bulk_job(rest, youth, dry, profile=True, skills='off'):
+def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
     """The whole database: players that are in the EA FC export are converted, the others are kept or brought to the EA level (same profile, lower level)."""
     global JOB
     t0 = time.time()
     YF['youth'] = bool(youth)
     YF['profile'] = bool(profile)
     YF['skills'] = skills
+    YF['psboost'] = bool(psboost)
     profs = {}
     pb = M.pb
     jn = journal()
@@ -759,7 +765,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off'):
                 continue
             m = match(pid)
             if m['status'] == 'ok':
-                p = preview(dict(pid=pid, youth=youth, skills=skills))
+                p = preview(dict(pid=pid, youth=youth, skills=skills, psboost=psboost))
                 if not p.get('ok'):
                     cnt['failed'] += 1
                     continue
@@ -1215,7 +1221,7 @@ class H(BaseHTTPRequestHandler):
                 if JOB.get('state') == 'running':
                     self.send_json(dict(ok=False, msg='A run is active.'))
                 else:
-                    threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True), body.get('skills', 'off')), daemon=True).start()
+                    threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True), body.get('skills', 'off'), bool(body.get('psboost'))), daemon=True).start()
                     time.sleep(0.2)
                     self.send_json(dict(ok=True))
             elif self.path == '/api/settings':

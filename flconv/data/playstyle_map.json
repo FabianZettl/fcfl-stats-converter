@@ -1,56 +1,665 @@
 {
-  "_doc": "EA FC PlayStyle -> skills and COM playing styles of PES 21 (own proposal, see docs/PLAYSTYLE_MAPPING.md). 'plus' = additionally for the PlayStyle+ version. Skills without a known bit in Player.bin (Knuckle Shot, Rabona, No Look Pass, Super-sub, GK Penalty Saver) are left out.",
-  "skills": {
-    "Acrobatic": {"skills": ["Acrobatic Finishing"]},
-    "Chip Shot": {"skills": ["Chip Shot Control"]},
-    "Dead Ball": {"skills": ["Penalty Specialist"], "min": {"penalties": 75}},
-    "Finesse Shot": {"skills": ["Long Range Drive"]},
-    "Gamechanger": {"skills": ["Outside Curler"]},
-    "Low Driven Shot": {"skills": ["Rising Shots"], "plus": ["First-time Shot"]},
-    "Power Shot": {"skills": ["Long Range Shooting"]},
-    "Precision Header": {"skills": ["Heading"]},
-    "Incisive Pass": {"skills": ["Through Passing"]},
-    "Inventive": {"skills": ["Outside Curler"]},
-    "Long Ball Pass": {"skills": ["Weighted Pass"], "plus": ["Low Lofted Pass"], "com": ["Long Ball Expert"]},
-    "Pinged Pass": {"skills": ["One-touch Pass"]},
-    "Tiki Taka": {"skills": ["One-touch Pass", "Heel Trick"]},
-    "Whipped Pass": {"skills": ["Pinpoint Crossing"], "com": ["Early Cross"]},
-    "First Touch": {"skills": ["Double Touch"]},
-    "Press Proven": {"skills": ["Step On Ball Control"]},
-    "Rapid": {"com": ["Speeding Bullet"]},
-    "Technical": {"skills": ["Scissors Feint"], "one_of": ["Marseille Turn", "Cross Over Turn"], "com": ["Mazing Run"]},
-    "Trickster": {"skills": ["Flip Flap", "Sombrero", "Scotch Move"], "com": ["Trickster"]},
-    "Aerial Fortress": {"skills": ["Heading", "Acrobatic Clear"]},
-    "Anticipate": {"skills": ["Man Marking"]},
-    "Block": {"skills": ["Acrobatic Clear"]},
-    "Intercept": {"skills": ["Interception"]},
-    "Jockey": {"skills": ["Man Marking"]},
-    "Bruiser": {"skills": ["Fighting Spirit"]},
-    "Enforcer": {"skills": ["Fighting Spirit"]},
-    "Long Throw": {"skills": ["Long Throw"]},
-    "Quick Step": {"com": ["Speeding Bullet"]},
-    "Relentless": {"skills": ["Fighting Spirit"]},
-    "Far Throw": {"skills": ["GK Long Throw", "GK Low Punt"]}
+ "_doc": "EA FC PlayStyle -> skills and COM playing styles of PES 21 (own proposal, see docs/PLAYSTYLE_MAPPING.md). 'plus' = additionally for the PlayStyle+ version. Skills without a known bit in Player.bin (Knuckle Shot, Rabona, No Look Pass, Super-sub, GK Penalty Saver) are left out.",
+ "skills": {
+  "Acrobatic": {
+   "skills": [
+    "Acrobatic Finishing"
+   ]
   },
-  "styles": [
-    {"pos": [12, 11], "need": ["Power Shot", "Low Driven Shot", "Precision Header"], "min": 2, "style": "Goal Poacher"},
-    {"pos": [12, 11], "need": ["Bruiser", "Precision Header", "Aerial Fortress"], "min": 2, "style": "Target Man"},
-    {"pos": [12, 11], "need": ["Tiki Taka", "Incisive Pass", "Technical"], "min": 2, "style": "Dummy Runner"},
-    {"pos": [9, 10, 6, 7], "need": ["Finesse Shot", "Technical", "Rapid"], "min": 2, "style": "Prolific Winger"},
-    {"pos": [9, 10, 6, 7], "need": ["Whipped Pass", "Rapid"], "min": 2, "style": "Cross Specialist"},
-    {"pos": [9, 10, 6, 7], "need": ["Incisive Pass", "Tiki Taka", "Technical"], "min": 2, "style": "Roaming Flank"},
-    {"pos": [8], "need": ["Incisive Pass", "Tiki Taka", "Inventive"], "min": 2, "style": "Creative Playmaker"},
-    {"pos": [8], "need": ["Technical", "First Touch"], "min": 2, "style": "Classic No. 10"},
-    {"pos": [8], "need": ["Quick Step", "Finesse Shot", "Low Driven Shot"], "min": 2, "style": "Hole Player"},
-    {"pos": [5], "need": ["Relentless", "Intercept"], "min": 2, "style": "Box-to-Box"},
-    {"pos": [5, 4], "need": ["Bruiser", "Anticipate", "Intercept"], "min": 2, "style": "The Destroyer"},
-    {"pos": [4], "need": ["Long Ball Pass", "Pinged Pass", "Incisive Pass"], "min": 2, "style": "Orchestrator"},
-    {"pos": [4], "need": ["Anticipate", "Intercept", "Block"], "min": 2, "style": "Anchor Man"},
-    {"pos": [1], "need": ["Long Ball Pass", "Pinged Pass"], "min": 2, "style": "Build Up"},
-    {"pos": [2, 3], "need": ["Rapid", "Whipped Pass", "Quick Step"], "min": 2, "style": "Offensive Full-back"},
-    {"pos": [2, 3], "need": ["Finesse Shot", "Low Driven Shot"], "min": 2, "style": "Full-back Finisher"},
-    {"pos": [2, 3], "need": ["Anticipate", "Intercept", "Jockey"], "min": 2, "style": "Defensive Full-back"},
-    {"pos": [0], "need": ["Far Reach", "Deflector", "Cross Claimer"], "min": 2, "style": "Defensive Goalkeeper"},
-    {"pos": [0], "need": ["1v1 Close Down", "Footwork", "Far Throw"], "min": 2, "style": "Offensive Goalkeeper"}
-  ]
+  "Chip Shot": {
+   "skills": [
+    "Chip Shot Control"
+   ]
+  },
+  "Dead Ball": {
+   "skills": [
+    "Penalty Specialist"
+   ],
+   "min": {
+    "penalties": 75
+   }
+  },
+  "Finesse Shot": {
+   "skills": [
+    "Long Range Drive"
+   ]
+  },
+  "Gamechanger": {
+   "skills": [
+    "Outside Curler"
+   ]
+  },
+  "Low Driven Shot": {
+   "skills": [
+    "Rising Shots"
+   ],
+   "plus": [
+    "First-time Shot"
+   ]
+  },
+  "Power Shot": {
+   "skills": [
+    "Long Range Shooting"
+   ]
+  },
+  "Precision Header": {
+   "skills": [
+    "Heading"
+   ]
+  },
+  "Incisive Pass": {
+   "skills": [
+    "Through Passing"
+   ]
+  },
+  "Inventive": {
+   "skills": [
+    "Outside Curler"
+   ]
+  },
+  "Long Ball Pass": {
+   "skills": [
+    "Weighted Pass"
+   ],
+   "plus": [
+    "Low Lofted Pass"
+   ],
+   "com": [
+    "Long Ball Expert"
+   ]
+  },
+  "Pinged Pass": {
+   "skills": [
+    "One-touch Pass"
+   ]
+  },
+  "Tiki Taka": {
+   "skills": [
+    "One-touch Pass",
+    "Heel Trick"
+   ]
+  },
+  "Whipped Pass": {
+   "skills": [
+    "Pinpoint Crossing"
+   ],
+   "com": [
+    "Early Cross"
+   ]
+  },
+  "First Touch": {
+   "skills": [
+    "Double Touch"
+   ]
+  },
+  "Press Proven": {
+   "skills": [
+    "Step On Ball Control"
+   ]
+  },
+  "Rapid": {
+   "com": [
+    "Speeding Bullet"
+   ]
+  },
+  "Technical": {
+   "skills": [
+    "Scissors Feint"
+   ],
+   "one_of": [
+    "Marseille Turn",
+    "Cross Over Turn"
+   ],
+   "com": [
+    "Mazing Run"
+   ]
+  },
+  "Trickster": {
+   "skills": [
+    "Flip Flap",
+    "Sombrero",
+    "Scotch Move"
+   ],
+   "com": [
+    "Trickster"
+   ]
+  },
+  "Aerial Fortress": {
+   "skills": [
+    "Heading",
+    "Acrobatic Clear"
+   ]
+  },
+  "Anticipate": {
+   "skills": [
+    "Man Marking"
+   ]
+  },
+  "Block": {
+   "skills": [
+    "Acrobatic Clear"
+   ]
+  },
+  "Intercept": {
+   "skills": [
+    "Interception"
+   ]
+  },
+  "Jockey": {
+   "skills": [
+    "Man Marking"
+   ]
+  },
+  "Bruiser": {
+   "skills": [
+    "Fighting Spirit"
+   ]
+  },
+  "Enforcer": {
+   "skills": [
+    "Fighting Spirit"
+   ]
+  },
+  "Long Throw": {
+   "skills": [
+    "Long Throw"
+   ]
+  },
+  "Quick Step": {
+   "com": [
+    "Speeding Bullet"
+   ]
+  },
+  "Relentless": {
+   "skills": [
+    "Fighting Spirit"
+   ]
+  },
+  "Far Throw": {
+   "skills": [
+    "GK Long Throw",
+    "GK Low Punt"
+   ]
+  }
+ },
+ "styles": [
+  {
+   "pos": [
+    12,
+    11
+   ],
+   "need": [
+    "Power Shot",
+    "Low Driven Shot",
+    "Precision Header"
+   ],
+   "min": 2,
+   "style": "Goal Poacher"
+  },
+  {
+   "pos": [
+    12,
+    11
+   ],
+   "need": [
+    "Bruiser",
+    "Precision Header",
+    "Aerial Fortress"
+   ],
+   "min": 2,
+   "style": "Target Man"
+  },
+  {
+   "pos": [
+    12,
+    11
+   ],
+   "need": [
+    "Tiki Taka",
+    "Incisive Pass",
+    "Technical"
+   ],
+   "min": 2,
+   "style": "Dummy Runner"
+  },
+  {
+   "pos": [
+    9,
+    10,
+    6,
+    7
+   ],
+   "need": [
+    "Finesse Shot",
+    "Technical",
+    "Rapid"
+   ],
+   "min": 2,
+   "style": "Prolific Winger"
+  },
+  {
+   "pos": [
+    9,
+    10,
+    6,
+    7
+   ],
+   "need": [
+    "Whipped Pass",
+    "Rapid"
+   ],
+   "min": 2,
+   "style": "Cross Specialist"
+  },
+  {
+   "pos": [
+    9,
+    10,
+    6,
+    7
+   ],
+   "need": [
+    "Incisive Pass",
+    "Tiki Taka",
+    "Technical"
+   ],
+   "min": 2,
+   "style": "Roaming Flank"
+  },
+  {
+   "pos": [
+    8
+   ],
+   "need": [
+    "Incisive Pass",
+    "Tiki Taka",
+    "Inventive"
+   ],
+   "min": 2,
+   "style": "Creative Playmaker"
+  },
+  {
+   "pos": [
+    8
+   ],
+   "need": [
+    "Technical",
+    "First Touch"
+   ],
+   "min": 2,
+   "style": "Classic No. 10"
+  },
+  {
+   "pos": [
+    8
+   ],
+   "need": [
+    "Quick Step",
+    "Finesse Shot",
+    "Low Driven Shot"
+   ],
+   "min": 2,
+   "style": "Hole Player"
+  },
+  {
+   "pos": [
+    5
+   ],
+   "need": [
+    "Relentless",
+    "Intercept"
+   ],
+   "min": 2,
+   "style": "Box-to-Box"
+  },
+  {
+   "pos": [
+    5,
+    4
+   ],
+   "need": [
+    "Bruiser",
+    "Anticipate",
+    "Intercept"
+   ],
+   "min": 2,
+   "style": "The Destroyer"
+  },
+  {
+   "pos": [
+    4
+   ],
+   "need": [
+    "Long Ball Pass",
+    "Pinged Pass",
+    "Incisive Pass"
+   ],
+   "min": 2,
+   "style": "Orchestrator"
+  },
+  {
+   "pos": [
+    4
+   ],
+   "need": [
+    "Anticipate",
+    "Intercept",
+    "Block"
+   ],
+   "min": 2,
+   "style": "Anchor Man"
+  },
+  {
+   "pos": [
+    1
+   ],
+   "need": [
+    "Long Ball Pass",
+    "Pinged Pass"
+   ],
+   "min": 2,
+   "style": "Build Up"
+  },
+  {
+   "pos": [
+    2,
+    3
+   ],
+   "need": [
+    "Rapid",
+    "Whipped Pass",
+    "Quick Step"
+   ],
+   "min": 2,
+   "style": "Offensive Full-back"
+  },
+  {
+   "pos": [
+    2,
+    3
+   ],
+   "need": [
+    "Finesse Shot",
+    "Low Driven Shot"
+   ],
+   "min": 2,
+   "style": "Full-back Finisher"
+  },
+  {
+   "pos": [
+    2,
+    3
+   ],
+   "need": [
+    "Anticipate",
+    "Intercept",
+    "Jockey"
+   ],
+   "min": 2,
+   "style": "Defensive Full-back"
+  },
+  {
+   "pos": [
+    0
+   ],
+   "need": [
+    "Far Reach",
+    "Deflector",
+    "Cross Claimer"
+   ],
+   "min": 2,
+   "style": "Defensive Goalkeeper"
+  },
+  {
+   "pos": [
+    0
+   ],
+   "need": [
+    "1v1 Close Down",
+    "Footwork",
+    "Far Throw"
+   ],
+   "min": 2,
+   "style": "Offensive Goalkeeper"
+  }
+ ],
+ "boost": {
+  "_doc": "PlayStyles that PES can only show through the values (or that have no real skill): the attributes get +1 (PlayStyle) / +2 (PlayStyle+) before the fit to the overall, so the other attributes give way. mode 'plus': only the PlayStyle+ version, +1.",
+  "Slide Tackle": {
+   "attrs": [
+    "BallWinning",
+    "Aggression"
+   ],
+   "mode": "always"
+  },
+  "Jockey": {
+   "attrs": [
+    "BallWinning",
+    "Speed"
+   ],
+   "mode": "always"
+  },
+  "Block": {
+   "attrs": [
+    "DefensiveAwareness"
+   ],
+   "mode": "always"
+  },
+  "Anticipate": {
+   "attrs": [
+    "BallWinning",
+    "DefensiveAwareness"
+   ],
+   "mode": "always"
+  },
+  "Quick Step": {
+   "attrs": [
+    "Acceleration"
+   ],
+   "mode": "always"
+  },
+  "Relentless": {
+   "attrs": [
+    "Stamina"
+   ],
+   "mode": "always"
+  },
+  "Rapid": {
+   "attrs": [
+    "Speed"
+   ],
+   "mode": "always"
+  },
+  "Footwork": {
+   "attrs": [
+    "GKReflexes"
+   ],
+   "mode": "always"
+  },
+  "Deflector": {
+   "attrs": [
+    "GKReflexes"
+   ],
+   "mode": "always"
+  },
+  "Far Reach": {
+   "attrs": [
+    "GKReach"
+   ],
+   "mode": "always"
+  },
+  "Cross Claimer": {
+   "attrs": [
+    "GKCatching",
+    "GKReach"
+   ],
+   "mode": "always"
+  },
+  "1v1 Close Down": {
+   "attrs": [
+    "GKReflexes",
+    "GKCatching"
+   ],
+   "mode": "always"
+  },
+  "Rush Out": {
+   "attrs": [
+    "GKAwareness"
+   ],
+   "mode": "always"
+  },
+  "Acrobatic": {
+   "attrs": [
+    "Finishing",
+    "Balance"
+   ],
+   "mode": "plus"
+  },
+  "Chip Shot": {
+   "attrs": [
+    "Finishing",
+    "Curl"
+   ],
+   "mode": "plus"
+  },
+  "Dead Ball": {
+   "attrs": [
+    "PlaceKicking",
+    "Curl"
+   ],
+   "mode": "plus"
+  },
+  "Finesse Shot": {
+   "attrs": [
+    "Curl",
+    "Finishing"
+   ],
+   "mode": "plus"
+  },
+  "Gamechanger": {
+   "attrs": [
+    "Curl",
+    "Dribbling"
+   ],
+   "mode": "plus"
+  },
+  "Low Driven Shot": {
+   "attrs": [
+    "Finishing",
+    "KickingPower"
+   ],
+   "mode": "plus"
+  },
+  "Power Shot": {
+   "attrs": [
+    "KickingPower"
+   ],
+   "mode": "plus"
+  },
+  "Precision Header": {
+   "attrs": [
+    "Heading",
+    "Jump"
+   ],
+   "mode": "plus"
+  },
+  "Incisive Pass": {
+   "attrs": [
+    "LowPass",
+    "OffensiveAwareness"
+   ],
+   "mode": "plus"
+  },
+  "Inventive": {
+   "attrs": [
+    "LowPass",
+    "Curl"
+   ],
+   "mode": "plus"
+  },
+  "Long Ball Pass": {
+   "attrs": [
+    "LoftedPass"
+   ],
+   "mode": "plus"
+  },
+  "Pinged Pass": {
+   "attrs": [
+    "LowPass"
+   ],
+   "mode": "plus"
+  },
+  "Tiki Taka": {
+   "attrs": [
+    "BallControl",
+    "TightPossession"
+   ],
+   "mode": "plus"
+  },
+  "Whipped Pass": {
+   "attrs": [
+    "LoftedPass",
+    "Curl"
+   ],
+   "mode": "plus"
+  },
+  "First Touch": {
+   "attrs": [
+    "BallControl"
+   ],
+   "mode": "plus"
+  },
+  "Press Proven": {
+   "attrs": [
+    "TightPossession",
+    "Balance"
+   ],
+   "mode": "plus"
+  },
+  "Technical": {
+   "attrs": [
+    "Dribbling",
+    "BallControl"
+   ],
+   "mode": "plus"
+  },
+  "Trickster": {
+   "attrs": [
+    "Dribbling"
+   ],
+   "mode": "plus"
+  },
+  "Aerial Fortress": {
+   "attrs": [
+    "Heading",
+    "Jump"
+   ],
+   "mode": "plus"
+  },
+  "Intercept": {
+   "attrs": [
+    "DefensiveAwareness"
+   ],
+   "mode": "plus"
+  },
+  "Bruiser": {
+   "attrs": [
+    "PhysicalContact"
+   ],
+   "mode": "plus"
+  },
+  "Enforcer": {
+   "attrs": [
+    "PhysicalContact",
+    "Balance"
+   ],
+   "mode": "plus"
+  },
+  "Long Throw": {
+   "attrs": [
+    "KickingPower"
+   ],
+   "mode": "plus"
+  }
+ }
 }

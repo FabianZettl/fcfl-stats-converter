@@ -38,3 +38,46 @@ def derive(styles, pos, raw=None, pid=0):
             style = r['style']
             break
     return dict(skills=skills, com=com, style=style)
+
+
+def boosts(styles):
+    """-> {attribute: bonus} from the PlayStyles (dict from parse): PlayStyle +1 / PlayStyle+ +2 for 'always', only PlayStyle+ (+1) for 'plus'; the biggest bonus per attribute"""
+    out = {}
+    for st, plus in styles.items():
+        b = MAP['boost'].get(st)
+        if not b:
+            continue
+        v = (2 if plus else 1) if b['mode'] == 'always' else (1 if plus else 0)
+        for a in b['attrs']:
+            if v > out.get(a, 0):
+                out[a] = v
+    return out
+
+
+_MODEL = []
+
+
+def from_values(raw, pos):
+    """skills and COM playing styles that the EA FC values alone make clear (the share of right ones is at least 50 %, fitted on the players that are in the game and in the EA data, tools/fit_skills.py);
+    raw: the attribute columns of the EA FC entry"""
+    if not _MODEL:
+        try:
+            _MODEL.append(json.load(open(os.path.join(HERE, '..', 'data', 'skill_model.json'))))
+        except OSError:
+            _MODEL.append({})
+    m = _MODEL[0]
+    if not m:
+        return set(), set()
+    gk = pos == 0
+    names = m['gk_attrs'] if gk else m['attrs']
+    try:
+        x = [float(raw[c]) for c in names]
+    except (KeyError, TypeError, ValueError):
+        return set(), set()
+    sk, cm = set(), set()
+    for grp, out in ((m['gk_skills'] if gk else m['skills']), sk), ((m['com'] if not gk else {}), cm):
+        for n, v in grp.items():
+            if 'thr_hi' in v and sum(w * a for w, a in zip(v['w'], x)) + v['b'] >= v['thr_hi']:
+                out.add(n)
+    sk.discard('Captaincy')
+    return sk, cm
