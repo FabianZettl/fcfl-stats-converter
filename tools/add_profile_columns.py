@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""One-off data preparation: adds weight, foot, weak_foot and skill_moves to flconv/data/fc27-players.csv.
+"""One-off data preparation: adds weight, foot, weak_foot, skill_moves and playstyles to flconv/data/fc27-players.csv.
   python3 tools/add_profile_columns.py ea.json [fifplay.csv]
-ea.json: the player list of the official EA ratings page (drop-api.ea.com/rating/ea-sports-fc, pages of 100 pulled one after the other, the field playerAbilities is not needed);
+ea.json: the player list of the official EA ratings page (drop-api.ea.com/rating/ea-sports-fc, pages of 100 pulled one after the other; PlayStyles are the labels in playerAbilities);
 the join is on the EA player id (stats_id). fifplay.csv (optional): the FIFPlay export on Kaggle, its foot values (FC 27) win over those of the ratings page.
 Heights that are missing in the CSV are filled from the ratings page, too."""
 import csv, json, sys, os
@@ -13,7 +13,7 @@ if len(sys.argv) > 2:
         fifp[r['stats_id']] = r
 rows = list(csv.DictReader(open(src, encoding='utf-8-sig')))
 cols = list(rows[0].keys())
-for c in ('weight', 'foot', 'weak_foot', 'skill_moves'):
+for c in ('weight', 'foot', 'weak_foot', 'skill_moves', 'playstyles'):
     if c not in cols:
         cols.append(c)
 n = dict(weight=0, foot=0, height=0)
@@ -24,6 +24,8 @@ for r in rows:
     r['foot'] = foot
     r['weak_foot'] = (f or {}).get('weak_foot') or (str(a['weakFootAbility']) if a and a.get('weakFootAbility') else r.get('weak_foot', ''))
     r['skill_moves'] = (f or {}).get('skill_moves') or (str(a['skillMoves']) if a and a.get('skillMoves') else r.get('skill_moves', ''))
+    if a is not None:   # PlayStyles of the ratings page, '+' marks the PlayStyle+ ('Rapid|Technical+')
+        r['playstyles'] = '|'.join(a.get('abil') or [x['label'] for x in a.get('playerAbilities', [])])
     if not r.get('height') and a and a.get('height'):
         r['height'] = str(a['height']); n['height'] += 1
     n['weight'] += bool(r['weight']); n['foot'] += bool(r['foot'])

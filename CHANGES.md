@@ -21,6 +21,7 @@ What is different or new:
 | Finding the player | by hand | automatic: full name, then year of birth, height, nation, club, overall last; uncertain players are listed for you to decide, your choices are remembered |
 | Repeatability | – | the conversion always starts from the original values; players that are already converted are marked and skipped unless something that matters has changed |
 | Height, weight, foot | – | height (8 bit field), weight (7 bit field, kg − 30) and preferred foot (1 bit) of `Player.bin` were located by comparing the file with the EA / FIFPlay data and are written from the EA FC entry or from your own value |
+| Skills and playing styles | – | the bits of the 35 skills, 7 COM playing styles, the playing style (22), weak foot and the positions in `Player.bin` were found by matching every bit of the in-game table (whose layout Gaffer knows) with `Player.bin`; the EA FC PlayStyles are mapped to them (`data/playstyle_map.json`) |
 | Names | – | names and shirt names can be edited or taken from the EA data (common name where there is one) |
 
 Everything in `flconv/lib/poscal.py`, `gkcal.py` and `ovr_weights_fl27.json` was fitted on one database (Football Life 2027) and is specific to it.

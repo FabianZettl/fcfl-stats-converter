@@ -15,7 +15,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, 'lib'))
 import convert  # noqa: E402
+import playstyle  # noqa: E402
 import collections  # noqa: E402
 import timeshift  # noqa: E402
 import dbmeta  # noqa: E402
@@ -369,7 +371,7 @@ def ahash(att):
     return hashlib.md5(bytes(att[a] for a in plbin.AB)).hexdigest()[:12]
 
 
-YF = dict(youth=True, profile=True)   # setting of the last write (for the journal)
+YF = dict(youth=True, profile=True, skills='off')   # setting of the last write (for the journal)
 
 
 def sig_of(pid, src, youth):
@@ -378,7 +380,7 @@ def sig_of(pid, src, youth):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
-    return hashlib.md5(('%s|%d|%d|p%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)))).encode()).hexdigest()[:10]
+    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0))).encode()).hexdigest()[:10]
 
 
 def jentry(pid, src, att):
@@ -474,6 +476,32 @@ def profile_for(pid, row, edits=None):
             src = 'you'
         if new is not None:
             out[f] = dict(cur=cur[f], new=new, src=src)
+    return out
+
+
+def skillset_for(pid, row, mode):
+    """skills, COM playing styles and playing style from the EA FC PlayStyles of the entry: mode 'add' keeps what the player has, 'replace' gives him exactly what the PlayStyles give
+    -> {'skills'|'com_styles'|'playing_style': {cur, new, add, rem}} only where something changes"""
+    if mode not in ('add', 'replace') or not row:
+        return {}
+    ps = playstyle.parse(row['raw'].get('playstyles'))
+    if not ps:
+        return {}
+    pb = M.pb
+    i = pb.index[pid]
+    try:
+        pen = int(row['raw'].get('penalties')) if row['raw'].get('penalties') else None
+    except ValueError:
+        pen = None
+    d = playstyle.derive(ps, pos_of(pid), dict(penalties=pen), pid)
+    out = {}
+    for key, cur, want in (('skills', pb.skills(i), d['skills']), ('com_styles', pb.com_styles(i), d['com'])):
+        new = (cur | want) if mode == 'add' else set(want)
+        if new != cur:
+            out[key] = dict(cur=sorted(cur), new=sorted(new), add=sorted(new - cur), rem=sorted(cur - new))
+    cs = pb.playing_style(i)
+    if d['style'] and d['style'] != cs:
+        out['playing_style'] = dict(cur=cs, new=d['style'])
     return out
 
 
@@ -629,6 +657,9 @@ def preview(body):
         if row and not fm:
             p['names_ea'] = ea_names(row)
         p['profile'] = profile_for(pid, row if not fm else None, body.get('pedits'))
+        p['skillset'] = skillset_for(pid, row if not fm else None, body.get('skills', 'off'))
+        p['traits'] = dict(skills=sorted(M.pb.skills(i)), com=sorted(M.pb.com_styles(i)), style=M.pb.playing_style(i), weak_use=M.pb.weak_foot_use(i), weak_acc=M.pb.weak_foot_acc(i))
+        p['ea_styles'] = sorted(playstyle.parse(row['raw'].get('playstyles')).items()) if row and not fm else []
     if p.get('ok'):
         p['pid'] = pid
         p['name'] = M.name.get(pid)
@@ -648,6 +679,7 @@ def apply(body):
     dry = bool(body.get('dry'))
     YF['youth'] = bool(body.get('youth', True))
     YF['profile'] = bool(body.get('profile', True))
+    YF['skills'] = body.get('skills', 'off')
     choices = {int(k): v for k, v in (body.get('choices') or {}).items()}
     pids = [int(p) for p in body.get('pids') or []]
     for t in body.get('tids') or []:   # whole clubs: every player that is found unambiguously
@@ -659,7 +691,7 @@ def apply(body):
             report.append(dict(pid=pid, name=M.name.get(pid), ok=False, msg='already converted', skipped=True))
             continue
         try:
-            p = preview(dict(pid=pid, db_id=ch.get('db_id'), fm=ch.get('fm'), target=ch.get('target'), edits=ch.get('edits'), pedits=ch.get('pedits'), youth=body.get('youth', True)))
+            p = preview(dict(pid=pid, db_id=ch.get('db_id'), fm=ch.get('fm'), target=ch.get('target'), edits=ch.get('edits'), pedits=ch.get('pedits'), skills=YF['skills'], youth=body.get('youth', True)))
         except Exception as ex:
             p = dict(ok=False, msg=str(ex))
         if not p.get('ok'):
@@ -671,6 +703,8 @@ def apply(body):
             pr = {f: v['new'] for f, v in (p.get('profile') or {}).items() if v['new'] != v['cur'] and (YF['profile'] or v['src'] == 'you')}
             if pr:
                 profs[pid] = pr
+        if YF['skills'] != 'off' and p.get('skillset'):
+            profs.setdefault(pid, {}).update({k: v['new'] for k, v in p['skillset'].items()})
         want = dict(p.get('names_ea') or {}) if body.get('ea_names') else {}
         want.update(ch.get('names') or {})
         nm = {k: v for k, v in want.items() if k in plbin.NAME_OFFS and str(v).strip() and str(v) != p['names'].get(k)}
@@ -700,12 +734,13 @@ def commit(writes, srcs, names=None, profs=None):
 JOB = dict(state='idle')
 
 
-def bulk_job(rest, youth, dry, profile=True):
+def bulk_job(rest, youth, dry, profile=True, skills='off'):
     """The whole database: players that are in the EA FC export are converted, the others are kept or brought to the EA level (same profile, lower level)."""
     global JOB
     t0 = time.time()
     YF['youth'] = bool(youth)
     YF['profile'] = bool(profile)
+    YF['skills'] = skills
     profs = {}
     pb = M.pb
     jn = journal()
@@ -724,11 +759,13 @@ def bulk_job(rest, youth, dry, profile=True):
                 continue
             m = match(pid)
             if m['status'] == 'ok':
-                p = preview(dict(pid=pid, youth=youth))
+                p = preview(dict(pid=pid, youth=youth, skills=skills))
                 if not p.get('ok'):
                     cnt['failed'] += 1
                     continue
                 pr = {f: v['new'] for f, v in (p.get('profile') or {}).items() if v['new'] != v['cur']} if profile else {}
+                if skills != 'off':
+                    pr.update({k: v['new'] for k, v in (p.get('skillset') or {}).items()})
                 if p['final'] == cur and not pr:
                     cnt['already'] += 1
                     continue
@@ -1178,7 +1215,7 @@ class H(BaseHTTPRequestHandler):
                 if JOB.get('state') == 'running':
                     self.send_json(dict(ok=False, msg='A run is active.'))
                 else:
-                    threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True)), daemon=True).start()
+                    threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True), body.get('skills', 'off')), daemon=True).start()
                     time.sleep(0.2)
                     self.send_json(dict(ok=True))
             elif self.path == '/api/settings':

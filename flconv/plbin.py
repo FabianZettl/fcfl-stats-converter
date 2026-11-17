@@ -132,6 +132,58 @@ PlayerBin.set_name = lambda self, i, field, text: _set_name(self.data, i, field,
 PlayerBin.get_name = lambda self, i, field: get_name(self.data, i, field)
 
 
+
+# --- skills, COM playing styles, playing style, weak foot, positions: bit offsets of Player.bin, found by matching every bit of the in-game table (whose layout is known) with the
+# bit of Player.bin that has exactly the same values for 4,000 players (one single match for each)
+SKILL_BITS = {"Scissors Feint": 519, "Flip Flap": 485, "Marseille Turn": 497, "Sombrero": 482, "Cut Behind & Turn": 528, "Scotch Move": 525, "Heading": 495, "Long Range Drive": 527, "Acrobatic Finishing": 524, "Heel Trick": 505, "First-time Shot": 511, "One-touch Pass": 507, "Weighted Pass": 484, "Pinpoint Crossing": 483, "Outside Curler": 493, "Low Lofted Pass": 488, "GK Low Punt": 490, "Long Throw": 521, "GK Long Throw": 522, "Gamesmanship": 491, "Man Marking": 504, "Track Back": 517, "Acrobatic Clear": 530, "Captaincy": 492, "Fighting Spirit": 486, "Penalty Specialist": 501, "Chip Shot Control": 506, "Step On Ball Control": 500, "Dipping Shot": 494, "Rising Shots": 499, "Interception": 503, "Double Touch": 523, "Cross Over Turn": 287, "Long Range Shooting": 518, "Through Passing": 487}
+COM_BITS = {"Trickster": 489, "Mazing Run": 531, "Speeding Bullet": 526, "Incisive Run": 510, "Long Ball Expert": 529, "Early Cross": 447, "Long Ranger": 520}
+STYLE_OFF, STYLE_W = 155, 5   # index in STYLES
+STYLES = ['Balanced', 'Goal Poacher', 'Dummy Runner', 'Fox in the Box', 'Prolific Winger', 'Classic No. 10', 'Hole Player', 'Box-to-Box', 'Anchor Man', 'The Destroyer', 'Extra Frontman',
+          'Offensive Full-back', 'Defensive Full-back', 'Target Man', 'Creative Playmaker', 'Build Up', 'Offensive Goalkeeper', 'Defensive Goalkeeper', 'Roaming Flank', 'Cross Specialist',
+          'Orchestrator', 'Full-back Finisher']
+WEAK_USE_OFF, WEAK_ACC_OFF = 454, 462   # 2 bit each, value + 1 (1..4)
+POS_BITS = [[None, 351], [468, 469], [318, 319], [474, 475], [414, 415], [456, 457], [466, 467], [460, 461], [464, 465], [472, 473], [476, 477], [478, 479], [470, 471]]   # positions 0..12 (GK CB LB RB DMF CMF LMF RMF AMF LWF RWF SS CF): (low bit, high bit) of a 0..2 rating (2 = natural)
+
+
+def _pb_skills(self, i):
+    return {n for n, o in SKILL_BITS.items() if self.bits(i, o, 1)}
+
+
+def _pb_set_skills(self, i, names):
+    for n, o in SKILL_BITS.items():
+        self.set_bits(i, o, 1, 1 if n in names else 0)
+
+
+def _pb_com(self, i):
+    return {n for n, o in COM_BITS.items() if self.bits(i, o, 1)}
+
+
+def _pb_set_com(self, i, names):
+    for n, o in COM_BITS.items():
+        self.set_bits(i, o, 1, 1 if n in names else 0)
+
+
+def _pb_style(self, i):
+    v = self.bits(i, STYLE_OFF, STYLE_W)
+    return STYLES[v] if v < len(STYLES) else None
+
+
+def _pb_set_style(self, i, name):
+    self.set_bits(i, STYLE_OFF, STYLE_W, STYLES.index(name))
+
+
+def _pb_positions(self, i):
+    return [(self.bits(i, lo, 1) if lo is not None else 0) + 2 * self.bits(i, hi, 1) for lo, hi in POS_BITS]
+
+
+PlayerBin.skills, PlayerBin.set_skills = _pb_skills, _pb_set_skills
+PlayerBin.com_styles, PlayerBin.set_com_styles = _pb_com, _pb_set_com
+PlayerBin.playing_style, PlayerBin.set_playing_style = _pb_style, _pb_set_style
+PlayerBin.weak_foot_use = lambda self, i: self.bits(i, WEAK_USE_OFF, 2) + 1
+PlayerBin.weak_foot_acc = lambda self, i: self.bits(i, WEAK_ACC_OFF, 2) + 1
+PlayerBin.positions = _pb_positions
+
+
 def verify(path, expected_ids, expected, before):
     """Reads the file again and checks that exactly the expected attributes (and names) changed. expected: {pid: {'attrs': {...}, 'names': {...}, 'prof': {height, weight, foot}}} -> list of problems"""
     pb = PlayerBin(path)
