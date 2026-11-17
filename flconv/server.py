@@ -692,6 +692,7 @@ def apply(body):
     for t in body.get('tids') or []:   # whole clubs: every player that is found unambiguously
         pids += [p for p in squad_of(int(t)) if match(p)['status'] == 'ok' and p not in pids]
     report, writes, srcs, names, profs = [], {}, {}, {}, {}
+    sk_n = 0
     for pid in pids:
         ch = choices.get(pid) or {}
         if not ch and not body.get('force') and (len(pids) > 1) and is_done(pid, body.get('youth', True))[0]:
@@ -712,6 +713,7 @@ def apply(body):
                 profs[pid] = pr
         if YF['skills'] != 'off' and p.get('skillset'):
             profs.setdefault(pid, {}).update({k: v['new'] for k, v in p['skillset'].items()})
+            sk_n += 1
         want = dict(p.get('names_ea') or {}) if body.get('ea_names') else {}
         want.update(ch.get('names') or {})
         nm = {k: v for k, v in want.items() if k in plbin.NAME_OFFS and str(v).strip() and str(v) != p['names'].get(k)}
@@ -724,7 +726,7 @@ def apply(body):
             if nm:
                 names[pid] = nm
     if dry or not (writes or names):
-        return dict(ok=True, dry=True, report=report, written=0, profile=len(profs))
+        return dict(ok=True, dry=True, report=report, written=0, profile=len(profs), skills=sk_n)
     r = commit(writes, srcs, names, profs)
     if SET['mode'] == 'ml' and (names or profs):
         r['skipped'] = dict(names=len(names), profile=len(profs))   # the running game gets only the 25 attributes
@@ -772,8 +774,9 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                     cnt['failed'] += 1
                     continue
                 pr = {f: v['new'] for f, v in (p.get('profile') or {}).items() if v['new'] != v['cur']} if profile else {}
-                if skills != 'off':
-                    pr.update({k: v['new'] for k, v in (p.get('skillset') or {}).items()})
+                if skills != 'off' and p.get('skillset'):
+                    pr.update({k: v['new'] for k, v in p['skillset'].items()})
+                    cnt['skills'] += 1
                 if p['final'] == cur and not pr:
                     cnt['already'] += 1
                     continue
