@@ -839,7 +839,8 @@ def apply(body):
     sk_n = 0
     for pid in pids:
         ch = choices.get(pid) or {}
-        if not ch and not body.get('force') and (len(pids) > 1) and is_done(pid, body.get('youth', True))[0]:
+        done = not ch and not body.get('force') and (len(pids) > 1) and is_done(pid, body.get('youth', True))[0]
+        if done and (SET['mode'] == 'ml' or not (YF['profile'] or YF['skills'] != 'off')):
             report.append(dict(pid=pid, name=M.name.get(pid), ok=False, msg='already converted', skipped=True))
             continue
         try:
@@ -849,8 +850,12 @@ def apply(body):
         if not p.get('ok'):
             report.append(dict(pid=pid, name=M.name.get(pid), ok=False, msg=p.get('msg'), ovr=cur_ovr(pid)))
             continue
-        writes[pid] = p['final']
-        srcs[pid] = p.get('source') or 'EA FC'
+        cur = cur_attrs(pid)
+        if done:   # converted earlier: only what changed in the profile
+            p['final'] = cur
+        if p['final'] != cur:
+            writes[pid] = {a: v for a, v in p['final'].items() if v != cur[a]}   # only the values that differ
+            srcs[pid] = p.get('source') or 'EA FC'
         if YF['profile'] or ch.get('pedits'):
             pr = {f: v['new'] for f, v in (p.get('profile') or {}).items() if v['new'] != v['cur'] and (YF['profile'] or v['src'] == 'you')}
             if pr:
@@ -863,13 +868,16 @@ def apply(body):
         nm = {k: v for k, v in want.items() if k in plbin.NAME_OFFS and str(v).strip() and str(v) != p['names'].get(k)}
         if nm:
             names[pid] = nm
+        if done and pid not in profs:
+            report.append(dict(pid=pid, name=M.name.get(pid), ok=False, msg='already converted', skipped=True))
+            continue
         report.append(dict(pid=pid, name=M.name.get(pid), ok=True, ovr_cur=p['ovr_cur'], ovr_new=p['ovr_new'], target=p['ovr_target']))
     for pid, ch in choices.items():   # only names changed (nothing else to convert)
         if pid not in writes and (ch.get('names')) and pid in M.pb.index:
             nm = {k: v for k, v in ch['names'].items() if k in plbin.NAME_OFFS and str(v).strip()}
             if nm:
                 names[pid] = nm
-    if dry or not (writes or names):
+    if dry or not (writes or names or profs):
         return dict(ok=True, dry=True, report=report, written=0, profile=len(profs), skills=sk_n)
     r = commit(writes, srcs, names, profs)
     if SET['mode'] == 'ml' and (names or profs):
@@ -908,7 +916,8 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
             JOB['done'] = n
             i = pb.index[pid]
             cur = cur_attrs(pid)
-            if unchanged(pid, cur, youth, jn):
+            same = unchanged(pid, cur, youth, jn)
+            if same and (SET['mode'] == 'ml' or not (profile or skills != 'off') or jn[str(pid)]['src'] != 'EA FC'):
                 cnt['already'] += 1
                 continue
             m = match(pid)
@@ -921,15 +930,18 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                 if skills != 'off' and p.get('skillset'):
                     pr.update({k: v['new'] for k, v in p['skillset'].items()})
                     cnt['skills'] += 1
+                if same:   # converted earlier: only what changed in the profile (new PlayStyles, positions ...), the attributes stay
+                    p['final'] = cur
                 if p['final'] == cur and not pr:
                     cnt['already'] += 1
                     continue
                 if pr:
                     profs[pid] = pr
                     cnt['profile'] += 1
-                writes[pid], srcs[pid] = p['final'], 'EA FC'
-                chg_f.append(p['ovr_new'] - p['ovr_cur'])
-                cnt['converted'] += 1
+                if p['final'] != cur:
+                    writes[pid], srcs[pid] = {a: v for a, v in p['final'].items() if v != cur[a]}, 'EA FC'   # only the values that differ
+                    chg_f.append(p['ovr_new'] - p['ovr_cur'])
+                    cnt['converted'] += 1
             elif rest == 'scale':
                 j = jn.get(str(pid))
                 if j and j.get('src') == 'scaled' and j.get('h') == ahash(cur):
@@ -954,7 +966,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
             else:
                 cnt['kept'] += 1
         res = dict(counts=dict(cnt), mean_converted=round(sum(chg_f) / len(chg_f), 2) if chg_f else 0, mean_scaled=round(sum(chg_s) / len(chg_s), 2) if chg_s else 0, months=mo)
-        if dry or not writes:
+        if dry or not (writes or profs):
             JOB = dict(state='done', dry=True, result=res, secs=round(time.time() - t0, 1))
             return
         JOB['done'] = pb.n
