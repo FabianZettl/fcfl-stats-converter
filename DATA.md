@@ -1,7 +1,7 @@
 # Data
 
 `flconv/data/fc27-players.csv` – ratings and attributes of **EA SPORTS FC 27** (17,849 male players, snapshot 12 Sep 2026, with date of birth),
-with the heights of 7,725 of them added from a second data set.
+with height, weight, preferred foot, weak foot and skill moves added where they are known (see below).
 
 | Part | Source | License / note |
 |---|---|---|
@@ -16,3 +16,8 @@ and the attribute columns `crossing, finishing, heading, short_passing, volleys,
 sprint_speed, jumping, long_shots, shot_power, stamina, strength, aggression, positioning, composure, interceptions, penalties, vision, def_awareness, standing_tackle, sliding_tackle,
 gk_diving, gk_handling, gk_kicking, gk_positioning, gk_reflexes`. Rows with club `ICON` or `Hero` are ignored.
 The potential column is empty in this data set (it is filled by pasting a SoFIFA page).
+
+**Columns `weight`, `foot`, `weak_foot`, `skill_moves` and missing heights** were added with `tools/add_profile_columns.py` (join on the EA player id `stats_id`):
+* weight (12,026 players), weak foot, skill moves and heights that the first data set lacks (5,639): the official EA ratings page (`drop-api.ea.com/rating/ea-sports-fc`), pulled 17 Nov 2026. It still serves an older game version than FC 27 (players that are not in it get no value); height, weight and foot hardly change between versions.
+* preferred foot (13,467 players): the FIFPlay data above (FC 27) where it has the player, otherwise the ratings page.
+The tool writes height, weight and foot only where the data has a value; empty means "leave as it is".

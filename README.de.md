@@ -13,9 +13,11 @@ Du gibst den Pfad zu deiner `Player.bin` an, das Tool vergleicht deine Datenbank
 * **Manueller Konverter für SoFIFA und FMInside** – Spielerseite öffnen, alles markieren (Strg+A), kopieren (Strg+C), im Tool einfügen: es rechnet die Werte (SoFIFA) bzw. die Football-Manager-Attribute (FMInside) um.
   Suchknöpfe für beide Seiten bei jedem Spieler.
 * **Manuelle Anpassungen** – gewünschtes Overall eines Spielers einstellen (die Attribute werden angepasst), einzelne Attribute, Namen und Trikotnamen ändern.
+* **Größe, Gewicht und starker Fuß** des EA-Eintrags werden mitgeschrieben (Schalter in der Seitenleiste), mit Icons in der Profil-Karte des Spielers, eigene Werte sind möglich.
+* **Schreiben in eine laufende Master League** (optional, braucht **Gaffer**): die 25 Attribute gehen über die Bridge von Gaffer ins Spiel, in Paketen mit Fortschrittsbalken (siehe englische README).
 * Ordnerauswahl, Backups mit Wiederherstellung per Klick, bereits konvertierte Spieler werden markiert und übersprungen.
 
-**Geplant:** Anpassung von Größe, Gewicht, Positionen, Fähigkeiten und Spielstilen und mehr.
+**Geplant:** Positionen, Fähigkeiten, Spielstile und mehr.
 
 ## Start
 

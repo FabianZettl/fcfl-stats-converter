@@ -14,6 +14,13 @@ POS_NAMES = ['GK', 'CB', 'LB', 'RB', 'DMF', 'CMF', 'LMF', 'RMF', 'AMF', 'LWF', '
 _NOT_LEAGUE = re.compile(r'(CUP|CHAMPIONS|EUROPE_LEAGUE|WORLD|EURO$|COPA|ASIA|AFRICA|SUPER|UECL)')
 
 
+# 7 bit attribute fields of the 380 byte block of the in-game table (the original of the database, it does not change when Player.bin is written)
+_F7 = {'OffensiveAwareness': (0x03, 0), 'BallControl': (0x06, 5), 'Dribbling': (0x05, 6), 'TightPossession': (0x08, 0), 'Finishing': (0x08, 7), 'LowPass': (0x09, 6), 'LoftedPass': (0x0A, 5),
+       'Heading': (0x0C, 0), 'PlaceKicking': (0x0E, 5), 'Curl': (0x10, 0), 'Speed': (0x14, 7), 'Acceleration': (0x18, 7), 'KickingPower': (0x18, 0), 'Jump': (0x19, 6),
+       'PhysicalContact': (0x15, 6), 'Balance': (0x16, 5), 'Stamina': (0x1A, 5), 'DefensiveAwareness': (0x04, 0), 'BallWinning': (0x0C, 7), 'Aggression': (0x0D, 6),
+       'GKAwareness': (0x04, 7), 'GKCatching': (0x10, 7), 'GKClearing': (0x11, 6), 'GKReflexes': (0x12, 5), 'GKReach': (0x14, 0)}
+
+
 def _unz(path):
     raw = open(path, 'rb').read()
     if raw[3:8] != b'WESYS':

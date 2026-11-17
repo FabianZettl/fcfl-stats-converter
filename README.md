@@ -15,12 +15,15 @@ shows what would change (every attribute, old → new, with the reason) and offe
 * **Manual converter for SoFIFA and FMInside** – open the player page, select everything (Ctrl+A), copy (Ctrl+C), paste it into the tool: it converts the values (SoFIFA) or the Football Manager attributes (FMInside) to the game.
   Search buttons for both sites are on every player.
 * **Manual adjustments** – set the overall you want for a player (the attributes are moved to match), change single attributes, change names and shirt names.
+* **Height, weight and preferred foot** of the EA FC entry are written with the stats (switch in the sidebar), each with an icon in the profile card of the player, and you can type your own values.
+* **Writing into a running Master League** (optional, needs **Gaffer**): the 25 attributes are sent to the game through Gaffer's bridge, in packages with a progress bar. See below.
 * Folder picker, backups with one-click restore, players that are already converted are marked and skipped.
 
-**Planned:** adjustments of height, weight, positions, skills and play styles, and more.
+**Planned:** positions, skills, play styles and more.
 
 ![A club with its players](docs/screenshots/club-bayern.png)
 ![One player with every attribute and the reason for it](docs/screenshots/player-harry-kane.png)
+![Height, weight and foot in the profile card](docs/screenshots/profile.png)
 
 More: [a league club](docs/screenshots/club-3-liga.png) · [another club](docs/screenshots/club-molde.png) · [another player](docs/screenshots/player-tomas-jacob.png)
 
@@ -44,6 +47,15 @@ The tool opens `http://127.0.0.1:8790/` in your browser (it only listens on your
 
 Settings, backups and the copy of your original `Player.bin` are kept in `~/.local/share/fl-stats-converter` (Linux) or
 `%APPDATA%\FL-Stats-Converter` (Windows); `--data-dir` changes that.
+
+## Writing into a running Master League (needs Gaffer)
+
+By default the tool writes `Player.bin` (for new careers). To change a career that is already running you need **Gaffer** (a separate tool; its bridge is the way into the running game):
+choose *a running Master League* under *Write to*, and the folder of Gaffer's bridge (the one with `growth.csv`; the tool looks for `…/content/ml-immersion/bridge` next to your database).
+The game has to run in the Master League and F7 has to be pressed once (Gaffer's module). Then:
+* only the 25 attributes are sent (not names, height, weight or foot), and only values that differ from the running game;
+* writes of more than 20,000 values go **in packages**: the next one is sent when the game has answered the last, the progress is shown, and you can cancel the rest;
+* the write date is the date of the game, and the players of the clubs are the ones of your save (transfers included).
 
 ## What it does with a player
 

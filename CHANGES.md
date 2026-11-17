@@ -20,6 +20,7 @@ What is different or new:
 | Football Manager values | fixed formulas | the same formulas plus a **calibration** from FMInside pages of players that are also in the EA data (per attribute none / shift / affine, chosen by leave-one-out); attributes that FMInside hides or shows as a range (e.g. Determination, Flair: "generated when you start a save") are estimated from related attributes |
 | Finding the player | by hand | automatic: full name, then year of birth, height, nation, club, overall last; uncertain players are listed for you to decide, your choices are remembered |
 | Repeatability | – | the conversion always starts from the original values; players that are already converted are marked and skipped unless something that matters has changed |
+| Height, weight, foot | – | height (8 bit field), weight (7 bit field, kg − 30) and preferred foot (1 bit) of `Player.bin` were located by comparing the file with the EA / FIFPlay data and are written from the EA FC entry or from your own value |
 | Names | – | names and shirt names can be edited or taken from the EA data (common name where there is one) |
 
 Everything in `flconv/lib/poscal.py`, `gkcal.py` and `ovr_weights_fl27.json` was fitted on one database (Football Life 2027) and is specific to it.

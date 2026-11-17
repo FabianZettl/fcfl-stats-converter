@@ -23,6 +23,11 @@ assert pb.get(1, 'Speed') == 99 and pb.get(0, 'Speed') == 40 and pb.get(2, 'Spee
 pb.set_name(2, 'name', 'Ben Winterburn')
 pb.set_name(2, 'shirt', 'WINTERBURN')
 assert pb.get_name(2, 'name') == 'Ben Winterburn' and pb.get_name(2, 'shirt') == 'WINTERBURN' and pb.get_name(0, 'name') == ''
+pb.set_height(1, 195); pb.set_weight(1, 88); pb.set_foot(1, 'Left')
+assert (pb.height(1), pb.weight(1), pb.foot(1)) == (195, 88, 'Left') and (pb.height(0), pb.weight(0), pb.foot(0)) == (100, 30, 'Right')
+assert pb.get(1, 'Speed') == 99 and pb.get(1, 'Stamina') == 40   # the attributes are untouched
+pb.set_foot(1, 'Right')
+assert pb.foot(1) == 'Right' and pb.height(1) == 195
 pb.save()
 pb2 = plbin.PlayerBin(path)   # what was written is what is read again
 assert pb2.get(1, 'Speed') == 99 and pb2.get_name(2, 'name') == 'Ben Winterburn' and pb2.changed() == []

@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -42,7 +43,8 @@ DEF = dict(
 CFG = dict(DEF)
 LOCK = threading.Lock()
 SET_FILE = os.path.join(DATA, 'settings.json')
-SET = dict(dbpath='', date='')
+SET = dict(mode='db', dbpath='', date='', bridge='')   # mode: 'db' = the database file, 'ml' = a running Master League through Gaffer
+CFG['gaffer'] = 'http://127.0.0.1:8767'
 
 
 def resolve_pesdb(p):
@@ -72,10 +74,126 @@ def db_key():
 
 
 def journal_path():
+    if SET.get('mode') == 'ml':
+        return os.path.join(DATA, 'converted-ml.json')
     return os.path.join(DATA, 'converted-%s.json' % db_key())
 
 
+LIVE = dict(mt=None, d={})
+
+GDATE = dict(t=0, v=None)
+
+LSQ = dict(t=0, d=None)
+
+GL = dict(t=0, p=[], pot={})
+
+PEND = {}
+
+
+def live_attrs():
+    """values in the running game: the dump of the Gaffer bridge (players_dump.bin, 380 byte blocks)"""
+    p = os.path.join(bridge_dir(), 'players_dump.bin')
+    try:
+        mt = os.path.getmtime(p)
+    except OSError:
+        return {}
+    if LIVE['mt'] != mt:
+        d = {}
+        raw = open(p, 'rb').read()
+        for k in range(len(raw) // 380):
+            b = raw[k * 380:(k + 1) * 380]
+            pid = int.from_bytes(b[0x30:0x34], 'little')
+            d[pid] = {a: (int.from_bytes(b[off:off + 4], 'little') >> sh) & 127 for a, (off, sh) in dbmeta._F7.items()}
+        LIVE['mt'], LIVE['d'] = mt, d
+        GL['t'] = LSQ['t'] = GDATE['t'] = 0   # a new dump of the game: squads, clubs and date are read again too
+        MATCH.clear()
+    return LIVE['d']
+
+
+def cur_attrs(pid):
+    if SET['mode'] == 'ml':
+        a = live_attrs().get(pid)
+        pe = PEND.get(pid)
+        if pe and pe[0] > (LIVE['mt'] or 0):
+            a = dict(a or M.pb.attrs(M.pb.index[pid]), **pe[1])
+        if a:
+            return a
+    return M.pb.attrs(M.pb.index[pid])
+
+
+def gaffer_date():
+    """date of the running career in Gaffer (d/m/yyyy of the loaded save) -> (y, m, d) or None"""
+    if time.time() - GDATE['t'] < 20:
+        return GDATE['v']
+    v = None
+    try:
+        sl = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/slots', timeout=5))
+        st = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/state?slot=' + urllib.parse.quote(sl[0]['slot']), timeout=20))
+        d, m, y = [int(x) for x in str(st['info']['date']).split('/')[:3]]
+        v = (y, m, d)
+    except Exception:
+        v = None
+    GDATE['t'], GDATE['v'] = time.time(), v
+    return v
+
+
+def gaffer_list():
+    """all players of the running save from Gaffer (current club, potential); cached for 20 s"""
+    if time.time() - GL['t'] > 20 or not GL['p']:
+        sl = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/slots', timeout=5))
+        GL['p'] = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/players?slot=' + urllib.parse.quote(sl[0]['slot']), timeout=60))['players']
+        GL['pot'] = {p['id']: p['pot'] for p in GL['p'] if p.get('pot')}
+        GL['t'] = time.time()
+    return GL['p']
+
+
+def pot_of(pid):
+    """potential of the player in the game (FL scale, which is about 4 above the EA FC scale); None if Gaffer is not reachable"""
+    try:
+        gaffer_list()
+    except Exception:
+        return GL['pot'].get(pid)
+    return GL['pot'].get(pid)
+
+
+def live_squads():
+    """ML mode: the squads as they are in the running save (Gaffer: current club of every player, after transfers) -> (tid -> [pids], pid -> tid); None if not available"""
+    if SET['mode'] != 'ml':
+        return None
+    if time.time() - LSQ['t'] < 20:
+        return LSQ['d']
+    LSQ['t'] = time.time()
+    try:
+        P = gaffer_list()
+        keyed = collections.defaultdict(list)
+        for t in M.team:
+            if t in M.league_of:
+                keyed[fcdb.fold(M.team[t])].append(t)
+        bykey = collections.defaultdict(list)
+        for t in M.league_of:
+            bykey[fcdb.club_key(M.team[t])].append(t)
+        tid_of = {}
+        for c in {p.get('club') for p in P if p.get('club')}:
+            f = fcdb.fold(c)
+            L = keyed.get(f) or bykey.get(fcdb.club_key(c)) or []
+            if len(L) == 1:
+                tid_of[c] = L[0]
+        sq, of = collections.defaultdict(list), {}
+        for p in P:
+            t = tid_of.get(p.get('club'))
+            if t and p['id'] in M.pb.index:
+                sq[t].append(p['id'])
+                of[p['id']] = t
+        LSQ['d'] = (dict(sq), of, len(tid_of))
+    except Exception as ex:
+        print('[live squads]', ex)
+        LSQ['d'] = None
+    return LSQ['d']
+
+
 def target_date():
+    if SET['mode'] == 'ml':
+        return gaffer_date() or timeshift.BASE
     try:
         y, m, d = [int(x) for x in str(SET.get('date') or '').split('-')]
         return (y, m, d)
@@ -83,8 +201,6 @@ def target_date():
         return timeshift.BASE
 
 
-def cur_attrs(pid):
-    return M.pb.attrs(M.pb.index[pid])
 
 
 def months():
@@ -132,7 +248,8 @@ def base_club(pid):
 
 
 def club_name(pid):
-    return base_club(pid)
+    ls = live_squads()
+    return M.team.get((ls[1].get(pid) if ls and pid in ls[1] else M.club_of.get(pid)), '')
 
 
 def cur_ovr(pid):
@@ -234,7 +351,7 @@ def ahash(att):
     return hashlib.md5(bytes(att[a] for a in plbin.AB)).hexdigest()[:12]
 
 
-YF = dict(youth=True)   # setting of the last write (for the journal)
+YF = dict(youth=True, profile=True)   # setting of the last write (for the journal)
 
 
 def sig_of(pid, src, youth):
@@ -243,7 +360,7 @@ def sig_of(pid, src, youth):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
-    return hashlib.md5(('%s|%d|%d' % (sid, int(bool(youth)), int(months() // 3))).encode()).hexdigest()[:10]
+    return hashlib.md5(('%s|%d|%d|p%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)))).encode()).hexdigest()[:10]
 
 
 def jentry(pid, src, att):
@@ -303,7 +420,43 @@ def pl_row(pid, youth=True):
 
 
 def squad_of(tid):
-    return M.players_of(tid)
+    ls = live_squads()
+    return ls[0].get(tid, []) if ls and tid in ls[0] else M.players_of(tid)
+
+
+PROFILE_FIELDS = ('height', 'weight', 'foot')
+PROFILE_RANGE = dict(height=(140, 230), weight=(40, 140))
+
+
+def profile_for(pid, row, edits=None):
+    """height, weight and preferred foot: what the database has now and what the EA FC entry (or your own edit) says -> {field: {cur, new, src}}; only fields that have a value"""
+    pb = M.pb
+    i = pb.index[pid]
+    cur = dict(height=pb.height(i), weight=pb.weight(i), foot=pb.foot(i))
+    out = {}
+    for f in PROFILE_FIELDS:
+        new = src = None
+        if row:
+            raw = row['height'] if f == 'height' else row['raw'].get(f)
+            if f == 'foot':
+                new = raw if raw in ('Left', 'Right') else None
+            else:
+                try:
+                    new = int(float(raw)) if raw not in (None, '') else None
+                except (TypeError, ValueError):
+                    new = None
+            src = 'EA FC' if new is not None else None
+        ed = (edits or {}).get(f)
+        if ed not in (None, ''):
+            if f == 'foot':
+                new = 'Left' if str(ed).lower().startswith('l') else 'Right'
+            else:
+                lo, hi = PROFILE_RANGE[f]
+                new = max(lo, min(hi, int(float(ed))))
+            src = 'you'
+        if new is not None:
+            out[f] = dict(cur=cur[f], new=new, src=src)
+    return out
 
 
 def ea_names(row):
@@ -375,9 +528,13 @@ def youth_bonus(pid, rating, pot=None):
     f = YOUTH.get(age, 0.0 if age and age > 22 else (1.0 if age else 0.0))
     if not rating:
         return 0
-    if not pot:   # no potential known: no bonus
-        return 0
-    gap = pot - rating
+    if pot:   # potential on the EA FC scale (SoFIFA page or the data)
+        gap = pot - rating
+    else:     # potential of the game (Master League, via Gaffer; its scale is about 4 above EA FC); none known: no bonus
+        gp = pot_of(pid)
+        if not gp:
+            return 0
+        gap = gp - 4 - rating
     return int(round(min(3.0, max(0.0, (gap - 5) / 3.0)) * f))   # only a clearly large gap counts: from 6 points, +3 at 14
 
 
@@ -430,6 +587,7 @@ def preview(body):
         p['names'] = {f: M.pb.get_name(i, f) for f in ('name', 'shirt', 'nshirt')}
         if row and not fm:
             p['names_ea'] = ea_names(row)
+        p['profile'] = profile_for(pid, row if not fm else None, body.get('pedits'))
     if p.get('ok'):
         p['pid'] = pid
         p['name'] = M.name.get(pid)
@@ -448,18 +606,19 @@ def apply(body):
     """Writes the converted values of the chosen players (into Player.bin or into the running game, see the mode); the user's own values and names are applied on top."""
     dry = bool(body.get('dry'))
     YF['youth'] = bool(body.get('youth', True))
+    YF['profile'] = bool(body.get('profile', True))
     choices = {int(k): v for k, v in (body.get('choices') or {}).items()}
     pids = [int(p) for p in body.get('pids') or []]
     for t in body.get('tids') or []:   # whole clubs: every player that is found unambiguously
         pids += [p for p in squad_of(int(t)) if match(p)['status'] == 'ok' and p not in pids]
-    report, writes, srcs, names = [], {}, {}, {}
+    report, writes, srcs, names, profs = [], {}, {}, {}, {}
     for pid in pids:
         ch = choices.get(pid) or {}
         if not ch and not body.get('force') and (len(pids) > 1) and is_done(pid, body.get('youth', True))[0]:
             report.append(dict(pid=pid, name=M.name.get(pid), ok=False, msg='already converted', skipped=True))
             continue
         try:
-            p = preview(dict(pid=pid, db_id=ch.get('db_id'), fm=ch.get('fm'), target=ch.get('target'), edits=ch.get('edits'), youth=body.get('youth', True)))
+            p = preview(dict(pid=pid, db_id=ch.get('db_id'), fm=ch.get('fm'), target=ch.get('target'), edits=ch.get('edits'), pedits=ch.get('pedits'), youth=body.get('youth', True)))
         except Exception as ex:
             p = dict(ok=False, msg=str(ex))
         if not p.get('ok'):
@@ -467,6 +626,10 @@ def apply(body):
             continue
         writes[pid] = p['final']
         srcs[pid] = p.get('source') or 'EA FC'
+        if YF['profile'] or ch.get('pedits'):
+            pr = {f: v['new'] for f, v in (p.get('profile') or {}).items() if v['new'] != v['cur'] and (YF['profile'] or v['src'] == 'you')}
+            if pr:
+                profs[pid] = pr
         want = dict(p.get('names_ea') or {}) if body.get('ea_names') else {}
         want.update(ch.get('names') or {})
         nm = {k: v for k, v in want.items() if k in plbin.NAME_OFFS and str(v).strip() and str(v) != p['names'].get(k)}
@@ -479,24 +642,30 @@ def apply(body):
             if nm:
                 names[pid] = nm
     if dry or not (writes or names):
-        return dict(ok=True, dry=True, report=report, written=0)
-    r = commit(writes, srcs, names)
-    return dict(r, report=report, dry=False)
+        return dict(ok=True, dry=True, report=report, written=0, profile=len(profs))
+    r = commit(writes, srcs, names, profs)
+    if SET['mode'] == 'ml' and (names or profs):
+        r['skipped'] = dict(names=len(names), profile=len(profs))   # the running game gets only the 25 attributes
+    return dict(r, report=report, dry=False, mode=SET['mode'])
 
 
-def commit(writes, srcs, names=None):
+def commit(writes, srcs, names=None, profs=None):
     """-> dict(ok, written, backup)"""
-    return write_all(writes, srcs, names or {})
+    if SET['mode'] == 'ml':
+        return ml_write(writes, srcs)
+    return write_all(writes, srcs, names or {}, profs or {})
 
 
 JOB = dict(state='idle')
 
 
-def bulk_job(rest, youth, dry):
+def bulk_job(rest, youth, dry, profile=True):
     """The whole database: players that are in the EA FC export are converted, the others are kept or brought to the EA level (same profile, lower level)."""
     global JOB
     t0 = time.time()
     YF['youth'] = bool(youth)
+    YF['profile'] = bool(profile)
+    profs = {}
     pb = M.pb
     jn = journal()
     writes, srcs = {}, {}
@@ -508,7 +677,7 @@ def bulk_job(rest, youth, dry):
         for n, pid in enumerate(pb.ids):
             JOB['done'] = n
             i = pb.index[pid]
-            cur = pb.attrs(i)
+            cur = cur_attrs(pid)
             if unchanged(pid, cur, youth, jn):
                 cnt['already'] += 1
                 continue
@@ -518,9 +687,13 @@ def bulk_job(rest, youth, dry):
                 if not p.get('ok'):
                     cnt['failed'] += 1
                     continue
-                if p['final'] == cur:
+                pr = {f: v['new'] for f, v in (p.get('profile') or {}).items() if v['new'] != v['cur']} if profile else {}
+                if p['final'] == cur and not pr:
                     cnt['already'] += 1
                     continue
+                if pr:
+                    profs[pid] = pr
+                    cnt['profile'] += 1
                 writes[pid], srcs[pid] = p['final'], 'EA FC'
                 chg_f.append(p['ovr_new'] - p['ovr_cur'])
                 cnt['converted'] += 1
@@ -545,13 +718,14 @@ def bulk_job(rest, youth, dry):
             return
         JOB['done'] = pb.n
         JOB['phase'] = 'writing'
-        r = commit(writes, srcs)
+        r = commit(writes, srcs, None, profs)
         JOB = dict(state='done' if r.get('ok') else 'error', dry=False, result=res, write=r, secs=round(time.time() - t0, 1))
     except Exception as ex:
         JOB = dict(state='error', msg=str(ex))
 
 
-def write_all(writes, srcs, names):
+def write_all(writes, srcs, names, profs=None):
+    profs = profs or {}
     """Player.bin: backup, write, read again and check, journal"""
     with LOCK:
         pb = M.pb
@@ -565,8 +739,11 @@ def write_all(writes, srcs, names):
             for pid, nm in names.items():
                 for k, v in nm.items():
                     pb.set_name(pb.index[pid], k, v)
+            for pid, pr in profs.items():
+                for k, v in pr.items():
+                    getattr(pb, 'set_' + k)(pb.index[pid], v)
             pb.save()
-            exp = {pid: dict(attrs=writes.get(pid), names=names.get(pid)) for pid in set(writes) | set(names)}
+            exp = {pid: dict(attrs=writes.get(pid), names=names.get(pid), prof=profs.get(pid)) for pid in set(writes) | set(names) | set(profs)}
             bad = plbin.verify(pb.path, pb.ids, exp, before)
             if bad:
                 raise ValueError('; '.join(bad[:3]))
@@ -580,10 +757,166 @@ def write_all(writes, srcs, names):
         for pid in writes:
             jn[str(pid)] = jentry(pid, srcs.get(pid), pb.attrs(pb.index[pid]))
         json.dump(jn, open(CFG['journal'], 'w'))
-        return dict(ok=True, written=len(writes), names=len(names), backup=bk)
+        return dict(ok=True, written=len(writes), names=len(names), profile=len(profs), backup=bk)
 
 
-def fs_list(path):
+ML_TAGS = {}
+
+ML_CHUNK = int(os.environ.get('FLDB_CHUNK', 20000))
+
+JQ = dict(state='idle')
+
+JQ_RESULT = {}
+
+
+def _bridge(name):
+    return os.path.join(bridge_dir(), name)
+
+
+def _compact(tx):
+    """removes the commands of the packages that are done (or cancelled) from growth.csv, so that the file stays small; atomic, and tried again when Gaffer appended meanwhile"""
+    p = _bridge('growth.csv')
+    for _ in range(5):
+        size = os.path.getsize(p)
+        with open(p, encoding='utf-8', errors='replace', newline='') as fh:
+            keep = [ln for ln in fh.read().split('\n') if ln and ln.split(',', 1)[0] not in tx]
+        tmp = p + '.tmp'
+        with open(tmp, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write('\n'.join(keep) + ('\n' if keep else ''))
+        if os.path.getsize(p) == size:
+            os.replace(tmp, p)
+            return
+    os.remove(tmp)
+
+
+def _jwrite(pids, writes, srcs):
+    jn = journal()
+    for pid in pids:
+        jn[str(pid)] = jentry(pid, srcs.get(pid), writes[pid])
+    json.dump(jn, open(CFG['journal'], 'w'))
+
+
+def _feed(tag, chunks, writes, srcs, expect):
+    """package by package: append to growth.csv, wait until the game has answered every command of the package, remove the package from the file, next"""
+    global JQ
+    rp = _bridge('growth-result.csv')
+    off = os.path.getsize(rp) if os.path.isfile(rp) else 0
+    try:
+        for ci, (pids, lines) in enumerate(chunks, 1):
+            if JQ.get('cancel'):
+                break
+            tx = {ln.split(',', 1)[0] for ln in lines}
+            seen = set()
+            for pid in pids:
+                PEND[pid] = (time.time(), dict(writes[pid]))
+            with open(_bridge('growth.csv'), 'a', encoding='utf-8', newline='\n') as fh:
+                fh.write('\n'.join(lines) + '\n')
+            JQ.update(chunk=ci, sent=JQ['sent'] + len(lines), msg='Package %d of %d sent, waiting for the game …' % (ci, len(chunks)))
+            last = time.time()
+            while len(seen) < len(tx) and not JQ.get('cancel'):
+                time.sleep(2)
+                if os.path.isfile(rp) and os.path.getsize(rp) > off:
+                    with open(rp, 'rb') as fh:
+                        fh.seek(off)
+                        data = fh.read()
+                    cut = data.rfind(b'\n') + 1
+                    off += cut
+                    for ln in data[:cut].decode('utf-8', 'replace').split('\n'):
+                        r = ln.strip().split(',')   # the game writes CRLF
+                        if len(r) >= 4 and r[0] in tx and r[0] not in seen:
+                            seen.add(r[0])
+                            last = time.time()
+                            if r[1] == 'ok':
+                                JQ['ok' if str(expect.get(r[0])) == r[3] else 'different'] += 1
+                            else:
+                                JQ['failed'] += 1
+                    JQ['confirmed'] = JQ['ok'] + JQ['different'] + JQ['failed']
+                waited = time.time() - last
+                JQ['msg'] = ('Package %d of %d: ' % (ci, len(chunks))) + ('waiting for the game … is the Master League loaded and F7 pressed? (%d s)' % waited if waited > 45 else 'the game is writing …')
+            if len(seen) >= len(tx):
+                _compact(tx)
+                _jwrite(pids, writes, srcs)
+                JQ['players_done'] += len(pids)
+            else:   # cancelled: take back what the game has not answered yet
+                _compact(tx)
+                _jwrite([p for p in pids if all(ln.split(',', 1)[0] in seen for ln in lines if ln.split(',')[1] == str(p))], writes, srcs)
+        JQ.update(state='cancelled' if JQ.get('cancel') else 'done', msg='Cancelled.' if JQ.get('cancel') else 'All packages are written.', ended=time.time())
+    except Exception as ex:
+        JQ.update(state='error', msg='Stopped: %s' % ex, ended=time.time())
+
+
+def ml_write(writes, srcs):
+    """The running Master League (the way Gaffer does it for single players): 'set' commands in growth.csv of the bridge, the Lua module GrowthBridge writes them into the memory
+    of the game while a career runs (F7 once). Only values that differ from the running game are sent. Big writes go package by package (ML_CHUNK values), see _feed."""
+    global JQ
+    live = live_attrs()
+    tag = 'fldb%d' % int(time.time())
+    per = {}
+    for pid, att in writes.items():
+        cur = live.get(pid) or M.pb.attrs(M.pb.index[pid])
+        L = ['%s-%d-%s,%d,%s,set,%d' % (tag, pid, a, pid, a, v) for a, v in att.items() if cur.get(a) != v]
+        if L:
+            per[pid] = L
+    n = sum(len(L) for L in per.values())
+    if not n:
+        return dict(ok=True, written=0, lines=0, msg='The running game already has these values.')
+    ML_TAGS[tag] = {(pid, a): v for pid, att in writes.items() for a, v in att.items() if pid in per and (live.get(pid) or M.pb.attrs(M.pb.index[pid])).get(a) != v}
+    if n <= ML_CHUNK:
+        for pid, att in writes.items():
+            PEND[pid] = (time.time(), dict(att))
+        with open(_bridge('growth.csv'), 'a', encoding='utf-8', newline='\n') as fh:
+            fh.write('\n'.join(ln for L in per.values() for ln in L) + '\n')
+        _jwrite(list(writes), writes, srcs)
+        return dict(ok=True, written=len(writes), lines=n, tag=tag, backup='growth.csv (bridge)')
+    if JQ.get('state') == 'running':
+        return dict(ok=False, msg='A big write is still running (%s of %s values confirmed). Wait for it or cancel it first.' % (format(JQ['confirmed'], ','), format(JQ['total'], ',')))
+    chunks, cur_p, cur_l = [], [], []
+    for pid, L in per.items():
+        if cur_l and len(cur_l) + len(L) > ML_CHUNK:
+            chunks.append((cur_p, cur_l))
+            cur_p, cur_l = [], []
+        cur_p.append(pid)
+        cur_l += L
+    if cur_l:
+        chunks.append((cur_p, cur_l))
+    expect = {'%s-%d-%s' % (tag, pid, a): v for (pid, a), v in ML_TAGS[tag].items()}
+    JQ = dict(state='running', tag=tag, total=n, sent=0, confirmed=0, ok=0, different=0, failed=0, chunk=0, chunks=len(chunks), players=len(per), players_done=0, started=time.time(), msg='Starting …')
+    threading.Thread(target=_feed, args=(tag, chunks, writes, srcs, expect), daemon=True).start()
+    return dict(ok=True, written=len(writes), lines=n, tag=tag, chunked=True, chunks=len(chunks), backup='growth.csv (bridge), in %d packages' % len(chunks))
+
+
+def ml_status(tag):
+    """what the game reports for the commands of one write (growth-result.csv of the bridge): confirmed values against the values that were sent"""
+    if JQ.get('tag') == tag:   # a big write: the feeder counts
+        return dict(ok=True, total=JQ['total'], confirmed=JQ['ok'], different=JQ['different'], failed=JQ['failed'], rows=[], game_running=True, job={k: v for k, v in JQ.items() if k != 'cancel'})
+    exp = ML_TAGS.get(tag) or {}
+    got = {}
+    p = _bridge('growth-result.csv')
+    if os.path.isfile(p):
+        pre = tag + '-'
+        with open(p, encoding='utf-8', errors='replace') as fh:
+            for ln in fh:
+                if ln.startswith(pre):
+                    r = ln.rstrip('\n').split(',')
+                    if len(r) >= 4:
+                        m = r[0][len(pre):].split('-', 1)
+                        if len(m) == 2 and m[0].isdigit():
+                            got[(int(m[0]), m[1])] = (r[1], r[2], r[3])
+    rows, ok, bad = [], 0, 0
+    for (pid, a), v in exp.items():
+        g = got.get((pid, a))
+        if g and g[0] == 'ok':
+            if str(v) == g[2]:
+                ok += 1
+            else:
+                bad += 1
+        if len(exp) <= 60 or (g and g[0] == 'ok' and str(v) != g[2]):
+            rows.append(dict(pid=pid, attr=a, expected=v, status=g[0] if g else 'waiting', old=g[1] if g else None, new=g[2] if g else None))
+    other = sum(1 for g in got.values() if g[0] != 'ok')
+    return dict(ok=True, total=len(exp), confirmed=ok, different=bad, failed=other, rows=rows[:80], game_running=bool(live_attrs()))
+
+
+def fs_list(path, kind=''):
     """for the folder picker of the page: the sub folders of a folder (the server runs on your own computer); path '' = the start points (drives on Windows)"""
     path = os.path.expanduser(str(path or '').strip().strip('"'))
     if not path:
@@ -603,23 +936,50 @@ def fs_list(path):
         for n in sorted(os.listdir(path), key=str.lower):
             f = os.path.join(path, n)
             if os.path.isdir(f) and not n.startswith('.'):
-                dirs.append(dict(name=n, path=f, player=bool(resolve_pesdb(f))))
+                dirs.append(dict(name=n, path=f, player=os.path.isfile(os.path.join(f, 'growth.csv')) if kind == 'bridge' else bool(resolve_pesdb(f))))
     except OSError as ex:
         return dict(ok=False, msg='Cannot read this folder: %s' % ex)
     par = os.path.dirname(path)
-    return dict(ok=True, path=path, parent=par if par != path else '', home=os.path.expanduser('~'), dirs=dirs, found=resolve_pesdb(path))
+    return dict(ok=True, path=path, parent=par if par != path else '', home=os.path.expanduser('~'), dirs=dirs, found=(path if os.path.isfile(os.path.join(path, 'growth.csv')) else None) if kind == 'bridge' else resolve_pesdb(path))
+
+
+def find_bridge():
+    """the bridge folder of Gaffer next to the database: .../SiderAddons/content/ml-immersion/bridge"""
+    p = os.path.abspath(CFG['pesdb'] or '.')
+    while True:
+        c = os.path.join(p, 'content', 'ml-immersion', 'bridge')
+        if os.path.isdir(c):
+            return c
+        q = os.path.dirname(p)
+        if q == p:
+            return ''
+        p = q
+
+
+def bridge_dir():
+    return SET.get('bridge') or find_bridge()
 
 
 def settings_view():
     r = resolve_pesdb(SET.get('dbpath'))
     td = target_date()
-    return dict(ok=True, dbpath=SET.get('dbpath'), pesdb=r, db_ok=bool(r), loaded=M is not None, date=SET.get('date') or '', data_dir=DATA,
-                target='%02d.%02d.%d' % td[::-1], base='01.09.2026', months=months(), players=M.pb.n if M else 0)
+    br = bridge_dir()
+    gd = gaffer_date() if SET['mode'] == 'ml' else None
+    return dict(ok=True, mode=SET['mode'], dbpath=SET.get('dbpath'), pesdb=r, db_ok=bool(r), loaded=M is not None, date=SET.get('date') or '', data_dir=DATA,
+                bridge=br, bridge_ok=bool(br and os.path.isfile(os.path.join(br, 'growth.csv'))), gaffer_date=('%02d.%02d.%d' % gd[::-1]) if gd else None,
+                target='%02d.%02d.%d' % td[::-1], base='01.09.2026', months=months(), players=M.pb.n if M else 0, live=len(live_attrs()) if SET['mode'] == 'ml' else 0)
 
 
 def settings_set(body):
     ch_db = False
     with LOCK:
+        if body.get('mode') in ('db', 'ml'):
+            SET['mode'] = body['mode']
+        if 'bridge' in body:
+            b = os.path.expanduser(str(body['bridge'] or '').strip().strip('"'))
+            if b and not os.path.isdir(b):
+                return dict(ok=False, msg='This bridge folder does not exist.')
+            SET['bridge'] = b
         if 'date' in body:
             SET['date'] = str(body['date'] or '')
         if body.get('dbpath') and body['dbpath'] != SET.get('dbpath'):
@@ -632,6 +992,7 @@ def settings_set(body):
         CFG['journal'] = journal_path()
     if ch_db:
         load()
+    GDATE['t'] = 0
     MATCH.clear()
     return settings_view()
 
@@ -693,7 +1054,7 @@ class H(BaseHTTPRequestHandler):
                 self.send_json(dict(ok=True, pesdb=CFG['pesdb'], loaded=M is not None, players=M.pb.n if M else 0, ea=len(EA.rows), csv=os.path.basename(CFG['csv']),
                                     leagues=[dict(id=c, name=L['name'], n=len(L['teams'])) for c, L in sorted(M.leagues.items(), key=lambda kv: kv[1]['name'])] if M else [], backups=backups()))
             elif u.path == '/api/fs':
-                self.send_json(fs_list((q.get('path') or [''])[0]))
+                self.send_json(fs_list((q.get('path') or [''])[0], (q.get('kind') or [''])[0]))
             elif u.path == '/api/league':
                 self.send_json(league_view(int(q['id'][0])))
             elif u.path == '/api/missing':
@@ -708,6 +1069,13 @@ class H(BaseHTTPRequestHandler):
                 self.send_json(fmcal.view(CFG['fmcal']))
             elif u.path == '/api/settings':
                 self.send_json(settings_view())
+            elif u.path == '/api/ml/job':
+                self.send_json(dict(ok=True, job={k: v for k, v in JQ.items() if k != 'cancel'}))
+            elif u.path == '/api/stamp':
+                live_attrs()
+                self.send_json(dict(ok=True, dump=LIVE['mt'], mode=SET['mode']))
+            elif u.path == '/api/ml/status':
+                self.send_json(ml_status(q['tag'][0]))
             elif u.path == '/api/job':
                 self.send_json(dict(ok=True, **JOB))
             elif u.path == '/api/backups':
@@ -741,11 +1109,14 @@ class H(BaseHTTPRequestHandler):
                 if JOB.get('state') == 'running':
                     self.send_json(dict(ok=False, msg='A run is active.'))
                 else:
-                    threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True))), daemon=True).start()
+                    threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True)), daemon=True).start()
                     time.sleep(0.2)
                     self.send_json(dict(ok=True))
             elif self.path == '/api/settings':
                 self.send_json(settings_set(body))
+            elif self.path == '/api/ml/cancel':
+                JQ['cancel'] = True
+                self.send_json(dict(ok=True))
             elif self.path == '/api/unassign':
                 assign_set(int(body['pid']), None)
                 self.send_json(dict(ok=True))
@@ -765,6 +1136,7 @@ def main():
     ap.add_argument('--db', help='folder with Player.bin (or the file itself)')
     ap.add_argument('--csv', help='EA FC export (default: the one that comes with the tool)')
     ap.add_argument('--no-browser', action='store_true')
+    ap.add_argument('--gaffer', help='address of Gaffer for the Master League mode (default: %s)' % CFG['gaffer'])
     a = ap.parse_args()
     if a.data_dir:
         DATA = os.path.abspath(a.data_dir)
@@ -772,6 +1144,8 @@ def main():
         SET_FILE = os.path.join(DATA, 'settings.json')
     if a.csv:
         CFG['csv'] = a.csv
+    if a.gaffer:
+        CFG['gaffer'] = a.gaffer
     os.makedirs(DATA, exist_ok=True)
     if not os.path.isfile(CFG['fmcal']):   # your own copy of the FM calibration, it grows with your samples
         shutil.copy2(os.path.join(HERE, 'data', 'fm_calib.json'), CFG['fmcal'])
