@@ -179,18 +179,18 @@ def gaffer_slot():
     return GSL['v']
 
 
-def _cached(cache, key, fetch, first_wait=True):
+def _cached(cache, key, fetch, first_wait=True, min_age=0):
     """what Gaffer gave for this state of the save (key); a new state is fetched in the background while the old value is still used, only the very first fetch waits.
     A failed fetch is not tried again for 30 s. This keeps the page fast when Gaffer is busy (its /api/state takes seconds and /api/players is 10 MB)."""
     name = id(cache)
-    if cache.get('key') == key and cache.get('v') is not None:
+    if cache.get('v') is not None and (cache.get('key') == key or time.time() - cache.get('ok', 0) < min_age):   # min_age: a heavy call of Gaffer is not repeated before that many seconds
         return cache['v']
-    if time.time() - cache.get('fail', 0) < 30:
+    if time.time() - cache.get('fail', 0) < max(30, min(min_age, 120)):   # Gaffer goes on with a call that timed out: do not pile up new ones
         return cache.get('v')
     def run():
         try:
             v = fetch()
-            cache.update(key=key, v=v, fail=0)
+            cache.update(key=key, v=v, fail=0, ok=time.time())
         except Exception:
             cache['fail'] = time.time()
         finally:
@@ -213,10 +213,10 @@ def gaffer_date():
     if not sl:
         return GDATE.get('v')
     def fetch():
-        st = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/state?slot=' + urllib.parse.quote(sl[0]), timeout=60))
+        st = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/state?slot=' + urllib.parse.quote(sl[0]), timeout=180))
         d, m, y = [int(x) for x in str(st['info']['date']).split('/')[:3]]
         return (y, m, d)
-    return _cached(GDATE, sl[1], fetch)
+    return _cached(GDATE, sl[1], fetch, min_age=300)   # /api/state of Gaffer reads the whole save (up to 25 s)
 
 
 def gaffer_list():
@@ -227,11 +227,11 @@ def gaffer_list():
             return GL['p']
         raise OSError('Gaffer not reachable')
     def fetch():
-        p = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/players?slot=' + urllib.parse.quote(sl[0]), timeout=120))['players']
+        p = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/players?slot=' + urllib.parse.quote(sl[0]), timeout=600))['players']
         GL['pot'] = {x['id']: x['pot'] for x in p if x.get('pot')}
         GL['t'] = time.time()
         return p
-    v = _cached(GL, sl[1], fetch)
+    v = _cached(GL, sl[1], fetch, min_age=1800)   # /api/players of Gaffer takes minutes and blocks Gaffer meanwhile
     if v is None:
         raise OSError('Gaffer not reachable')
     GL['p'] = v
