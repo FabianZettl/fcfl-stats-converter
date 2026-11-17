@@ -148,12 +148,30 @@ def gaffer_list():
 
 
 def pot_of(pid):
-    """potential of the player in the game (FL scale, which is about 4 above the EA FC scale); None if Gaffer is not reachable"""
+    """potential of the player in the game (FL scale, about 4 above EA FC). Gaffer's potential moves with the current overall of the player (it rises when he improves),
+    so it is kept the first time it is read: otherwise a conversion would change the youth bonus of the next one and the results would drift."""
+    pc = POTC['d']
+    if pc is None:
+        try:
+            pc = POTC['d'] = json.load(open(os.path.join(DATA, 'potential-ml.json')))
+        except (OSError, ValueError):
+            pc = POTC['d'] = {}
+    k = str(pid)
+    if k in pc:
+        return pc[k]
     try:
         gaffer_list()
     except Exception:
-        return GL['pot'].get(pid)
-    return GL['pot'].get(pid)
+        pass
+    v = GL['pot'].get(pid)
+    if v:
+        pc[k] = v
+        os.makedirs(DATA, exist_ok=True)
+        json.dump(pc, open(os.path.join(DATA, 'potential-ml.json'), 'w'))
+    return v
+
+
+POTC = dict(d=None)
 
 
 def live_squads():
