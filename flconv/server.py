@@ -479,6 +479,26 @@ def profile_for(pid, row, edits=None):
     return out
 
 
+def gaffer_player(pid):
+    """value, wage, potential and contract of the player in the running save (Gaffer), when Gaffer is reachable"""
+    try:
+        if SET['mode'] != 'ml' and not GUP['ok'] and time.time() - GUP['t'] < 30:
+            return None   # Gaffer was not reachable a moment ago
+        try:
+            gaffer_list()
+        except Exception:
+            GUP.update(t=time.time(), ok=False)
+            return None
+        GUP.update(t=time.time(), ok=True)
+        if GL.get('byid_t') != GL['t']:
+            GL['byid'] = {p['id']: p for p in GL['p']}
+            GL['byid_t'] = GL['t']
+        g = GL['byid'].get(pid)
+        return dict(mv=g.get('mv'), sal=g.get('sal'), pot=g.get('pot'), until=g.get('until'), ovr=g.get('ovr'), club=g.get('club')) if g else None
+    except Exception:
+        return None
+
+
 def skillset_for(pid, row, mode):
     """skills, COM playing styles and playing style from the EA FC PlayStyles of the entry: mode 'add' keeps what the player has, 'replace' gives him exactly what the PlayStyles give
     -> {'skills'|'com_styles'|'playing_style': {cur, new, add, rem}} only where something changes"""
@@ -664,6 +684,15 @@ def preview(body):
             p['names_ea'] = ea_names(row)
         p['profile'] = profile_for(pid, row if not fm else None, body.get('pedits'))
         p['skillset'] = skillset_for(pid, row if not fm else None, body.get('skills', 'off'))
+        p['pos_ovr'] = {k: int(round(convert.ovr_model(p['final'], k))) for k in range(13)}
+        p['positions'] = M.pb.positions(i)
+        p['pos_main'] = pos_of(pid)
+        raw = row['raw'] if (row and not fm) else {}
+        p['info'] = dict(full=('%s %s' % (raw.get('first_name', ''), raw.get('last_name', ''))).strip() if raw else '', nation=raw.get('nation_name') or '', club_ea=raw.get('club_name') or '',
+                         birthdate=raw.get('birthdate') or '', height=M.pb.height(i), weight=M.pb.weight(i), foot=M.pb.foot(i), ea_foot=raw.get('foot') or '', weak_foot=raw.get('weak_foot') or '',
+                         skill_moves=raw.get('skill_moves') or '', rating=(row or {}).get('rating') if row and not fm else None, potential=(row or {}).get('potential') if row and not fm else None,
+                         ea_pos=raw.get('position') or '', age=M.age.get(pid))
+        p['gaffer'] = gaffer_player(pid)
         p['traits'] = dict(skills=sorted(M.pb.skills(i)), com=sorted(M.pb.com_styles(i)), style=M.pb.playing_style(i), weak_use=M.pb.weak_foot_use(i), weak_acc=M.pb.weak_foot_acc(i))
         p['ea_styles'] = sorted(playstyle.parse(row['raw'].get('playstyles')).items()) if row and not fm else []
     if p.get('ok'):

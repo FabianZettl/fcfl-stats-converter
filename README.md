@@ -26,7 +26,7 @@ shows what would change (every attribute, old → new, with the reason) and offe
 
 ![A club with its players](docs/screenshots/club-bayern.png)
 ![One player with every attribute and the reason for it](docs/screenshots/player-harry-kane.png)
-![Height, weight and foot in the profile card](docs/screenshots/profile.png)
+![The player window: positions, radar, PlayStyles and skills, coloured attributes](docs/screenshots/player-card.png)
 
 More: [a league club](docs/screenshots/club-3-liga.png) · [another club](docs/screenshots/club-molde.png) · [another player](docs/screenshots/player-tomas-jacob.png)
 
