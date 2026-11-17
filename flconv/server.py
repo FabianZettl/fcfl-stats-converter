@@ -1266,6 +1266,8 @@ class H(BaseHTTPRequestHandler):
                 self.send_json(league_view(int(q['id'][0])))
             elif u.path == '/api/missing':
                 self.send_json(missing(int(q['id'][0]) if q.get('id') else None, int((q.get('limit') or ['500'])[0])))
+            elif u.path == '/api/prow':
+                self.send_json(dict(ok=True, row=pl_row(int(q['pid'][0]), (q.get('youth') or ['1'])[0] != '0')))
             elif u.path == '/api/club':
                 self.send_json(club_view(int(q['tid'][0]), (q.get('youth') or ['1'])[0] != '0'))
             elif u.path == '/api/search':
