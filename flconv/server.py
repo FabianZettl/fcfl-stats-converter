@@ -83,11 +83,11 @@ def journal_path():
 
 LIVE = dict(mt=None, d={})
 
-GDATE = dict(t=0, v=None)
+GDATE = dict(key=None, v=None, fail=0)
 
 LSQ = dict(t=0, d=None)
 
-GL = dict(t=0, p=[], pot={})
+GL = dict(key=None, v=None, fail=0, t=0, p=[], pot={})
 
 PEND = {}
 
@@ -107,7 +107,8 @@ def live_attrs():
             pid = int.from_bytes(b[0x30:0x34], 'little')
             d[pid] = {a: (int.from_bytes(b[off:off + 4], 'little') >> sh) & 127 for a, (off, sh) in dbmeta._F7.items()}
         LIVE['mt'], LIVE['d'] = mt, d
-        GL['t'] = LSQ['t'] = GDATE['t'] = 0   # a new dump of the game: squads, clubs and date are read again too
+        GL['key'] = GDATE['key'] = None   # a new dump of the game: club, potential and date are read again (in the background)
+        LSQ['t'] = 0
         MATCH.clear()
     return LIVE['d']
 
@@ -123,30 +124,79 @@ def cur_attrs(pid):
     return M.pb.attrs(M.pb.index[pid])
 
 
+GSL = dict(t=0, v=None)   # slot and modification time of the save in Gaffer
+GBUSY = set()
+
+
+def gaffer_slot():
+    """(slot, mtime) of the newest save in Gaffer; asked at most every 5 s (cheap)"""
+    if time.time() - GSL['t'] > 5:
+        try:
+            sl = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/slots', timeout=3))
+            GSL['v'] = (sl[0]['slot'], sl[0].get('mtime')) if sl else None
+        except Exception:
+            GSL['v'] = None
+        GSL['t'] = time.time()
+    return GSL['v']
+
+
+def _cached(cache, key, fetch, first_wait=True):
+    """what Gaffer gave for this state of the save (key); a new state is fetched in the background while the old value is still used, only the very first fetch waits.
+    A failed fetch is not tried again for 30 s. This keeps the page fast when Gaffer is busy (its /api/state takes seconds and /api/players is 10 MB)."""
+    name = id(cache)
+    if cache.get('key') == key and cache.get('v') is not None:
+        return cache['v']
+    if time.time() - cache.get('fail', 0) < 30:
+        return cache.get('v')
+    def run():
+        try:
+            v = fetch()
+            cache.update(key=key, v=v, fail=0)
+        except Exception:
+            cache['fail'] = time.time()
+        finally:
+            GBUSY.discard(name)
+    if cache.get('v') is None:   # nothing yet: the first fetch is waited for
+        if name in GBUSY:
+            return None
+        GBUSY.add(name)
+        run()
+        return cache.get('v')
+    if name not in GBUSY:
+        GBUSY.add(name)
+        threading.Thread(target=run, daemon=True).start()
+    return cache['v']
+
+
 def gaffer_date():
-    """date of the running career in Gaffer (d/m/yyyy of the loaded save) -> (y, m, d) or None"""
-    if time.time() - GDATE['t'] < 20:
-        return GDATE['v']
-    v = None
-    try:
-        sl = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/slots', timeout=5))
-        st = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/state?slot=' + urllib.parse.quote(sl[0]['slot']), timeout=20))
+    """date of the running career in Gaffer (d/m/yyyy of the loaded save) -> (y, m, d) or None; fetched again only when the save has changed"""
+    sl = gaffer_slot()
+    if not sl:
+        return GDATE.get('v')
+    def fetch():
+        st = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/state?slot=' + urllib.parse.quote(sl[0]), timeout=60))
         d, m, y = [int(x) for x in str(st['info']['date']).split('/')[:3]]
-        v = (y, m, d)
-    except Exception:
-        v = None
-    GDATE['t'], GDATE['v'] = time.time(), v
-    return v
+        return (y, m, d)
+    return _cached(GDATE, sl[1], fetch)
 
 
 def gaffer_list():
-    """all players of the running save from Gaffer (current club, potential); cached for 20 s"""
-    if time.time() - GL['t'] > 20 or not GL['p']:
-        sl = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/slots', timeout=5))
-        GL['p'] = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/players?slot=' + urllib.parse.quote(sl[0]['slot']), timeout=60))['players']
-        GL['pot'] = {p['id']: p['pot'] for p in GL['p'] if p.get('pot')}
+    """all players of the running save from Gaffer (current club, potential), fetched again only when the save has changed"""
+    sl = gaffer_slot()
+    if not sl:
+        if GL['p']:
+            return GL['p']
+        raise OSError('Gaffer not reachable')
+    def fetch():
+        p = json.load(urllib.request.urlopen(CFG['gaffer'] + '/api/players?slot=' + urllib.parse.quote(sl[0]), timeout=120))['players']
+        GL['pot'] = {x['id']: x['pot'] for x in p if x.get('pot')}
         GL['t'] = time.time()
-    return GL['p']
+        return p
+    v = _cached(GL, sl[1], fetch)
+    if v is None:
+        raise OSError('Gaffer not reachable')
+    GL['p'] = v
+    return v
 
 
 def pot_of(pid):
@@ -360,11 +410,23 @@ def match(pid):
     return m
 
 
+JC = dict(path=None, mt=None, d={})
+
+
 def journal():
+    """the journal of the tool (what was written for which player); parsed again only when the file has changed (it has tens of thousands of entries)"""
+    p = CFG['journal']
     try:
-        return json.load(open(CFG['journal']))
-    except Exception:
+        st = os.stat(p)
+    except OSError:
         return {}
+    if JC['path'] != p or JC['mt'] != (st.st_mtime_ns, st.st_size):
+        try:
+            JC['d'] = json.load(open(p))
+        except Exception:
+            JC['d'] = {}
+        JC['path'], JC['mt'] = p, (st.st_mtime_ns, st.st_size)
+    return JC['d']
 
 
 def ahash(att):
@@ -1195,7 +1257,7 @@ def settings_set(body):
         CFG['journal'] = journal_path()
     if ch_db:
         load()
-    GDATE['t'] = 0
+    GDATE['key'] = None
     MATCH.clear()
     return settings_view()
 
