@@ -9,6 +9,21 @@ shows what would change (every attribute, old → new, with the reason) and offe
 
 > Deutsche Anleitung: [README.de.md](README.de.md)
 
+## What is in it
+
+* **Update the active database with EA FC stats** – the main purpose. League, club, player or the whole database, found automatically in the EA FC data that comes with the tool.
+* **Manual converter for SoFIFA and FMInside** – open the player page, select everything (Ctrl+A), copy (Ctrl+C), paste it into the tool: it converts the values (SoFIFA) or the Football Manager attributes (FMInside) to the game.
+  Search buttons for both sites are on every player.
+* **Manual adjustments** – set the overall you want for a player (the attributes are moved to match), change single attributes, change names and shirt names.
+* Folder picker, backups with one-click restore, players that are already converted are marked and skipped.
+
+**Planned:** adjustments of height, weight, positions, skills and play styles, and more.
+
+![A club with its players](docs/screenshots/club-bayern.png)
+![One player with every attribute and the reason for it](docs/screenshots/player-harry-kane.png)
+
+More: [a league club](docs/screenshots/club-3-liga.png) · [another club](docs/screenshots/club-molde.png) · [another player](docs/screenshots/player-tomas-jacob.png)
+
 ## Start
 
 You need Python 3.9 or newer (nothing else, the tool uses only the standard library) **or** a download from the *Releases* page
