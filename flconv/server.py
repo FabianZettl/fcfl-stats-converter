@@ -100,17 +100,56 @@ def live_attrs():
     except OSError:
         return {}
     if LIVE['mt'] != mt:
-        d = {}
+        d, ix = {}, {}
         raw = open(p, 'rb').read()
         for k in range(len(raw) // 380):
             b = raw[k * 380:(k + 1) * 380]
             pid = int.from_bytes(b[0x30:0x34], 'little')
+            ix[pid] = k
             d[pid] = {a: (int.from_bytes(b[off:off + 4], 'little') >> sh) & 127 for a, (off, sh) in dbmeta._F7.items()}
-        LIVE['mt'], LIVE['d'] = mt, d
+        LIVE['mt'], LIVE['d'], LIVE['ix'], LIVE['raw'] = mt, d, ix, raw
         GL['key'] = GDATE['key'] = None   # a new dump of the game: club, potential and date are read again (in the background)
         LSQ['t'] = 0
         MATCH.clear()
     return LIVE['d']
+
+
+IG_SKILL = {'Scissors Feint': 291, 'Flip Flap': 292, 'Marseille Turn': 293, 'Sombrero': 294, 'Cut Behind & Turn': 295, 'Scotch Move': 296, 'Heading': 297, 'Long Range Drive': 298,
+            'Acrobatic Finishing': 300, 'Heel Trick': 301, 'First-time Shot': 302, 'One-touch Pass': 303, 'Weighted Pass': 304, 'Pinpoint Crossing': 305, 'Outside Curler': 306,
+            'Low Lofted Pass': 308, 'GK Low Punt': 309, 'Long Throw': 310, 'GK Long Throw': 311, 'Gamesmanship': 312, 'Man Marking': 313, 'Track Back': 314, 'Acrobatic Clear': 315,
+            'Captaincy': 316, 'Fighting Spirit': 318, 'Penalty Specialist': 320, 'Chip Shot Control': 322, 'Step On Ball Control': 323, 'Dipping Shot': 324, 'Rising Shots': 325,
+            'Interception': 327, 'Double Touch': 328, 'Cross Over Turn': 329, 'Long Range Shooting': 330, 'Through Passing': 331}   # name -> bit in the 380 byte block of the running game
+IG_COM = {'Trickster': 223, 'Mazing Run': 255, 'Speeding Bullet': 286, 'Incisive Run': 287, 'Long Ball Expert': 288, 'Early Cross': 289, 'Long Ranger': 290}
+IG_POS = (274, 268, 270, 272, 260, 262, 264, 266, 258, 253, 256, 251, 249)   # GK CB LB RB DMF CMF LMF RMF AMF LWF RWF SS CF: 2 bit 0..2
+assert set(IG_SKILL) == set(plbin.SKILL_BITS) and set(IG_COM) == set(plbin.COM_BITS)
+
+
+def ml_fields(pr):
+    """profile of the converter (skills, COM styles, playing style, positions) -> {field of the GrowthBridge module: value}"""
+    f = {}
+    if 'skills' in pr:
+        f.update({'B%d' % k: int(n in pr['skills']) for n, k in IG_SKILL.items()})
+    if 'com_styles' in pr:
+        f.update({'B%d' % k: int(n in pr['com_styles']) for n, k in IG_COM.items()})
+    if pr.get('playing_style') in plbin.STYLES:
+        f['Style'] = plbin.STYLES.index(pr['playing_style'])
+    if 'positions' in pr:
+        f.update({'P%d' % l: max(0, min(2, int(v))) for l, v in zip(IG_POS, pr['positions'])})
+    return f
+
+
+def live_x(pid):
+    """the same fields as in the running game (dump): {field: value}"""
+    live_attrs()
+    k = LIVE.get('ix', {}).get(pid)
+    if k is None:
+        return {}
+    b = LIVE['raw'][k * 380:(k + 1) * 380]
+    v = int.from_bytes(b, 'little')
+    f = {'B%d' % x: (v >> x) & 1 for x in list(IG_SKILL.values()) + list(IG_COM.values())}
+    f.update({'P%d' % l: (v >> l) & 3 for l in IG_POS})
+    f['Style'] = (b[0x1D] >> 3) & 31
+    return f
 
 
 def cur_attrs(pid):
@@ -840,7 +879,7 @@ def apply(body):
     for pid in pids:
         ch = choices.get(pid) or {}
         done = not ch and not body.get('force') and (len(pids) > 1) and is_done(pid, body.get('youth', True))[0]
-        if done and (SET['mode'] == 'ml' or not (YF['profile'] or YF['skills'] != 'off')):
+        if done and not (YF['profile'] or YF['skills'] != 'off'):
             report.append(dict(pid=pid, name=M.name.get(pid), ok=False, msg='already converted', skipped=True))
             continue
         try:
@@ -854,7 +893,7 @@ def apply(body):
         if done:   # converted earlier: only what changed in the profile
             p['final'] = cur
         if p['final'] != cur:
-            writes[pid] = {a: v for a, v in p['final'].items() if v != cur[a]}   # only the values that differ
+            writes[pid] = p['final']
             srcs[pid] = p.get('source') or 'EA FC'
         if YF['profile'] or ch.get('pedits'):
             pr = {f: v['new'] for f, v in (p.get('profile') or {}).items() if v['new'] != v['cur'] and (YF['profile'] or v['src'] == 'you')}
@@ -880,15 +919,15 @@ def apply(body):
     if dry or not (writes or names or profs):
         return dict(ok=True, dry=True, report=report, written=0, profile=len(profs), skills=sk_n)
     r = commit(writes, srcs, names, profs)
-    if SET['mode'] == 'ml' and (names or profs):
-        r['skipped'] = dict(names=len(names), profile=len(profs))   # the running game gets only the 25 attributes
+    if SET['mode'] == 'ml' and names:
+        r['skipped'] = dict(names=len(names))   # names, height, weight and foot are not written into the running game
     return dict(r, report=report, dry=False, mode=SET['mode'])
 
 
 def commit(writes, srcs, names=None, profs=None):
     """-> dict(ok, written, backup)"""
     if SET['mode'] == 'ml':
-        return ml_write(writes, srcs)
+        return ml_write(writes, srcs, profs)
     return write_all(writes, srcs, names or {}, profs or {})
 
 
@@ -917,7 +956,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
             i = pb.index[pid]
             cur = cur_attrs(pid)
             same = unchanged(pid, cur, youth, jn)
-            if same and (SET['mode'] == 'ml' or not (profile or skills != 'off') or jn[str(pid)]['src'] != 'EA FC'):
+            if same and (not (profile or skills != 'off') or jn[str(pid)]['src'] != 'EA FC'):
                 cnt['already'] += 1
                 continue
             m = match(pid)
@@ -939,7 +978,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                     profs[pid] = pr
                     cnt['profile'] += 1
                 if p['final'] != cur:
-                    writes[pid], srcs[pid] = {a: v for a, v in p['final'].items() if v != cur[a]}, 'EA FC'   # only the values that differ
+                    writes[pid], srcs[pid] = p['final'], 'EA FC'   # (the file only changes where values differ; the running game gets only the differences, see ml_write)
                     chg_f.append(p['ovr_new'] - p['ovr_cur'])
                     cnt['converted'] += 1
             elif rest == 'scale':
@@ -1045,7 +1084,8 @@ def _compact(tx):
 def _jwrite(pids, writes, srcs):
     jn = journal()
     for pid in pids:
-        jn[str(pid)] = jentry(pid, srcs.get(pid), writes[pid])
+        if pid in writes:
+            jn[str(pid)] = jentry(pid, srcs.get(pid), writes[pid])
     json.dump(jn, open(CFG['journal'], 'w'))
 
 
@@ -1061,7 +1101,8 @@ def _feed(tag, chunks, writes, srcs, expect):
             tx = {ln.split(',', 1)[0] for ln in lines}
             seen = set()
             for pid in pids:
-                PEND[pid] = (time.time(), dict(writes[pid]))
+                if pid in writes:
+                    PEND[pid] = (time.time(), dict(writes[pid]))
             with open(_bridge('growth.csv'), 'a', encoding='utf-8', newline='\n') as fh:
                 fh.write('\n'.join(lines) + '\n')
             JQ.update(chunk=ci, sent=JQ['sent'] + len(lines), msg='Package %d of %d sent, waiting for the game …' % (ci, len(chunks)))
@@ -1098,22 +1139,25 @@ def _feed(tag, chunks, writes, srcs, expect):
         JQ.update(state='error', msg='Stopped: %s' % ex, ended=time.time())
 
 
-def ml_write(writes, srcs):
+def ml_write(writes, srcs, profs=None):
     """The running Master League (the way Gaffer does it for single players): 'set' commands in growth.csv of the bridge, the Lua module GrowthBridge writes them into the memory
     of the game while a career runs (F7 once). Only values that differ from the running game are sent. Big writes go package by package (ML_CHUNK values), see _feed."""
     global JQ
     live = live_attrs()
     tag = 'fldb%d' % int(time.time())
-    per = {}
-    for pid, att in writes.items():
-        cur = live.get(pid) or M.pb.attrs(M.pb.index[pid])
-        L = ['%s-%d-%s,%d,%s,set,%d' % (tag, pid, a, pid, a, v) for a, v in att.items() if cur.get(a) != v]
+    per, want = {}, {}
+    xf = {pid: ml_fields(pr) for pid, pr in (profs or {}).items()}   # profile fields: only players that are in the running game
+    for pid in set(writes) | set(xf):
+        cur = dict(live.get(pid) or M.pb.attrs(M.pb.index[pid]), **(live_x(pid) if pid in xf else {}))
+        att = dict(writes.get(pid) or {}, **(xf.get(pid) if cur.get('Style') is not None else {}))
+        want[pid] = {a: v for a, v in att.items() if cur.get(a) != v}
+        L = ['%s-%d-%s,%d,%s,set,%d' % (tag, pid, a, pid, a, v) for a, v in want[pid].items()]
         if L:
             per[pid] = L
     n = sum(len(L) for L in per.values())
     if not n:
         return dict(ok=True, written=0, lines=0, msg='The running game already has these values.')
-    ML_TAGS[tag] = {(pid, a): v for pid, att in writes.items() for a, v in att.items() if pid in per and (live.get(pid) or M.pb.attrs(M.pb.index[pid])).get(a) != v}
+    ML_TAGS[tag] = {(pid, a): v for pid, att in want.items() for a, v in att.items()}
     if n <= ML_CHUNK:
         for pid, att in writes.items():
             PEND[pid] = (time.time(), dict(att))
