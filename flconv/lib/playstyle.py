@@ -194,8 +194,10 @@ MAX_SKILLS, MAX_COM = 10, 5   # what a player can have in the game (COM styles: 
 
 
 def cap(cur, want, mode, limit, rank):
-    """the skills (or COM styles) a player gets when he may only have `limit`: 'add' keeps what he has (as far as it fits) and fills up with the best of the wanted ones; 'replace' takes the best of
-    the wanted ones. rank(name) -> bigger = more important (PlayStyle that is the skill itself first, then how far the values are above the safe bar)"""
-    best = sorted(want, key=lambda n: (-rank(n), n))
-    keep = sorted(cur, key=lambda n: (-rank(n), n))[:limit] if mode == 'add' else []
-    return set(keep) | set([n for n in best if n not in keep][:max(0, limit - len(keep))])
+    """the skills (or COM styles) a player gets when he may only have `limit`. 'add' keeps what he has (as far as it fits) and fills up with the best of the wanted ones; 'replace' takes the best
+    `limit` of ALL: what he has plus what is wanted (on equal rank what he has stays). rank(name) -> bigger = more important (PlayStyle that is the skill itself first, then how far the values
+    are above the safe bar)"""
+    if mode == 'add':
+        keep = sorted(cur, key=lambda n: (-rank(n), n))[:limit]
+        return set(keep) | set([n for n in sorted(want, key=lambda n: (-rank(n), n)) if n not in keep][:max(0, limit - len(keep))])
+    return set(sorted(set(cur) | set(want), key=lambda n: (-rank(n), n not in cur, n))[:limit])

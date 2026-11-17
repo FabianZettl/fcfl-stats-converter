@@ -645,8 +645,8 @@ def values_traits_for(pid, final, mode, row=None, paste=False):
     if not cur_sk and not cur_cm or paste:   # a filled profile (from the game) is kept as it is; an empty one (or a pasted page) is filled from the values
         t = playstyle.traits_from_values(final, pos)
         rk = lambda n: t.get('margin', {}).get(n, 0)
-        t['skills'] = playstyle.cap(set(), t['skills'], 'replace', playstyle.MAX_SKILLS, rk)   # at most 10 skills / 5 COM styles
-        t['com'] = playstyle.cap(set(), t['com'], 'replace', playstyle.MAX_COM, rk)
+        t['skills'] = playstyle.cap(cur_sk, t['skills'], 'replace', playstyle.MAX_SKILLS, rk)   # at most 10 skills / 5 COM styles
+        t['com'] = playstyle.cap(cur_cm, t['com'], 'replace', playstyle.MAX_COM, rk)
         if t['skills']:
             out['skills'] = dict(cur=sorted(cur_sk), new=sorted(t['skills']), add=sorted(t['skills']), rem=[])
         if t['com']:

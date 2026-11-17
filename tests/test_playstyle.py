@@ -19,6 +19,7 @@ def _test_cap():
     r = lambda n: {'c': 1, 'd': 3, 'e': 2}.get(n, 0)
     assert P.cap({'a', 'b'}, {'c', 'd', 'e'}, 'add', 3, r) == {'a', 'b', 'd'}
     assert P.cap({'a', 'b'}, {'c', 'd', 'e'}, 'replace', 2, r) == {'d', 'e'}
+    assert P.cap({'c', 'x'}, {'d'}, 'replace', 2, r) == {'c', 'd'}   # what he has takes part in the choice
     assert len(P.cap(set(), {str(k) for k in range(20)}, 'replace', P.MAX_SKILLS, lambda n: int(n))) == 10
 
 
