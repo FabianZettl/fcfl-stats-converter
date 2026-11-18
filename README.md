@@ -98,3 +98,9 @@ GPL-3.0, see [LICENSE](LICENSE). The conversion formulas are derived from the *P
 ## Line-up from Sofascore (database mode)
 Club view -> *Line-up from Sofascore*: reads the last finished match of the club (unofficial Sofascore JSON through `curl`, throttled, cached in the data folder `sofa/`), shows the eleven, the bench and the shirt numbers and writes
 them into `PlayerAssignment.bin` (order and number in `k`; backup in `moved/`, read back and checked). The formation itself is not written. Sofascore does not promise this access: if it stops, only `flconv/sofa.py` has to change.
+
+## Performance since the date of the data (database and Master League)
+Club view -> *Performance since 01.09.*: reads the finished matches of the club since 01.09.2026 from Sofascore (rating, and Sofascore's own passing / dribbling / defending / shooting / goalkeeping values).
+Per player with at least 3 matches and 270 minutes: rating against the team (and against his level) plus the team-relative aspect values move single attributes (passing -> Low Pass / Lofted Pass, dribbling ->
+Dribbling / Ball Control / Tight Possession, defending -> Defensive Awareness / Ball Winning, shooting -> Finishing / Offensive Awareness, goalkeepers -> GK values), at most 3 per value and the overall at most 2
+(full weight from 900 minutes). Better than the team: up; worse: down. It is applied as development on top of the time shift when the player is converted; the player panel shows matches, rating and every change.

@@ -357,6 +357,7 @@ def load():
     MATCH.clear()
     ASSIGN.clear()
     ASSIGN.update(assign_load())
+    form_load()
 
 
 def pos_of(pid):
@@ -493,7 +494,7 @@ def sig_of(pid, src, youth):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
-    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0) + 4 * int(bool(YF.get('psboost'))))).encode()).hexdigest()[:10]
+    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0) + 4 * int(bool(YF.get('psboost')))) + '|f%s' % sorted(((FORM.get(pid) or {}).get('attr') or {}).items())).encode()).hexdigest()[:10]
 
 
 def jentry(pid, src, att):
@@ -747,6 +748,8 @@ def club_view(tid, youth=True):
     pl = [pl_row(p, youth) for p in pids]
     for x in pl:
         x['slot'], x['no'] = M.lineup.get((tid, x['pid']), (None, None))
+        f = FORM.get(x['pid'])
+        x['form'] = dict(n=f['n'], rating=f['rating'], ovr_d=f['ovr_d']) if f else None
     pl.sort(key=lambda x: (x['slot'] is None, x['slot'] if x['slot'] is not None else 0, -x['ovr']))   # the line-up of the database: starting eleven first
     return dict(ok=True, tid=tid, name=M.team.get(tid, ''), league=(M.leagues.get(M.league_of.get(tid)) or {}).get('name'), players=pl, found=sum(1 for x in pl if x['status'] == 'ok'), total=len(pl),
                 done=sum(1 for x in pl if x.get('done')))
@@ -830,7 +833,7 @@ def preview(body):
     want = body.get('target')   # a target typed by the user is the overall AFTER the development: the fit is moved by the difference (the development comes on top of the fit)
     tg = target
     for _ in range(4):
-        p = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'), boost=boost)
+        p = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'), boost=boost, form=(FORM.get(pid) or {}).get('attr'))
         if want is None or not p.get('ok') or p['ovr_new'] == int(want):
             break
         tg += int(want) - p['ovr_new']
@@ -842,6 +845,7 @@ def preview(body):
         p['assigned'] = True
     if p.get('ok'):
         p['youth'] = yb
+        p['form'] = FORM.get(pid)
         p['age'] = M.age.get(pid)
         p['months'] = mo
         p['date'] = '%02d.%02d.%d' % target_date()[::-1]
@@ -981,17 +985,30 @@ def _same(a, b):
     return bool(a and b) and (a == b or set(a) <= set(b) or set(b) <= set(a) or (a[0][:1] == b[0][:1] and difflib.SequenceMatcher(None, a[-1], b[-1]).ratio() >= 0.85))
 
 
+def _sofa_team(tid, sofa_id=None):
+    """Sofascore id of the club (the name is searched; None when nothing fits)"""
+    sofa.CACHE[0] = os.path.join(DATA, 'sofa')
+    if sofa_id:
+        return int(sofa_id)
+    name = M.team.get(tid, '')
+    words = [w for w in fcdb.fold(name).split() if len(w) > 2 and w not in ('fc', 'cf', 'sc', 'afc')]
+    cand = sofa.find_team(name) or sofa.find_team(' '.join(words[:2]))
+    hit = [c for c in cand if set(words) & set(fcdb.fold(c[1]).split())]
+    return hit[0][0] if hit else None
+
+
+def _find(squad, used, name):
+    """the one player of the squad that has this name (None when none or several)"""
+    c = [p for p in squad if p not in used and fcdb.fold(M.name[p]) == fcdb.fold(name)] or [p for p in squad if p not in used and _same(M.name[p], name)]
+    return c[0] if len(c) == 1 else None
+
+
 def lineup_plan(tid, sofa_id=None):
     """last match of the club on Sofascore -> the line-up for PlayerAssignment.bin: the eleven, then the bench (in Sofascore's order), then the rest of the squad in the old order; shirt numbers of the match"""
-    sofa.CACHE[0] = os.path.join(DATA, 'sofa')
     name = M.team.get(tid, '')
+    sofa_id = _sofa_team(tid, sofa_id)
     if not sofa_id:
-        words = [w for w in fcdb.fold(name).split() if len(w) > 2 and w not in ('fc', 'cf', 'sc', 'afc')]
-        cand = sofa.find_team(name) or sofa.find_team(' '.join(words[:2]))
-        hit = [c for c in cand if set(words) & set(fcdb.fold(c[1]).split())]
-        if not hit:
-            return dict(ok=False, msg='No club like "%s" found on Sofascore.' % name)
-        sofa_id = hit[0][0]
+        return dict(ok=False, msg='No club like "%s" found on Sofascore.' % name)
     m = sofa.last_lineup(int(sofa_id))
     if not m or not m['players']:
         return dict(ok=False, msg='Sofascore has no line-up for the last match of this club.')
@@ -999,10 +1016,10 @@ def lineup_plan(tid, sofa_id=None):
     old = {p: M.lineup.get((tid, p), (99, 0)) for p in squad}
     used, rows, miss = set(), [], []
     for sp in sorted(m['players'], key=lambda x: x['sub']):   # stable: the eleven first, in Sofascore's order
-        c = [p for p in squad if p not in used and fcdb.fold(M.name[p]) == fcdb.fold(sp['name'])] or [p for p in squad if p not in used and _same(M.name[p], sp['name'])]
-        if len(c) == 1 and sp['no']:
-            used.add(c[0])
-            rows.append(dict(pid=c[0], name=M.name[c[0]], sofa=sp['name'], no=int(sp['no']), start=not sp['sub'], pos=sp['pos']))
+        c = _find(squad, used, sp['name'])
+        if c and sp['no']:
+            used.add(c)
+            rows.append(dict(pid=c, name=M.name[c], sofa=sp['name'], no=int(sp['no']), start=not sp['sub'], pos=sp['pos']))
         else:
             miss.append(sp['name'])
     free = {r['no'] for r in rows}
@@ -1044,6 +1061,75 @@ def lineup_write(tid, sofa_id=None):
             M._assign()
             return dict(ok=False, msg='Check after writing failed, the backup was restored.')
     return dict(ok=True, written=len(want), backup=bk, edit=drop_edit())
+
+
+FORM = {}   # pid -> performance since the date of the data (Sofascore), see form_read
+ASP_ATTR = {'pass': ('LowPass', 'LoftedPass'), 'dribble': ('Dribbling', 'BallControl', 'TightPossession'), 'defensive': ('DefensiveAwareness', 'BallWinning'),
+            'shot': ('Finishing', 'OffensiveAwareness'), 'goalkeeper': ('GKReflexes', 'GKCatching', 'GKAwareness')}
+FORM_MIN_N, FORM_MIN_MIN, FORM_FULL_MIN, FORM_CAP = 3, 270, 900, 2
+
+
+def form_path():
+    return os.path.join(DATA, 'form-%s.json' % db_key())
+
+
+def form_load():
+    FORM.clear()
+    try:
+        FORM.update({int(k): v for k, v in json.load(open(form_path())).items()})
+    except Exception:
+        pass
+
+
+def form_read(tid, sofa_id=None):
+    """matches of the club since 01.09.2026 on Sofascore -> per player: rating against the team, Sofascore's passing / dribbling / defending / shooting / goalkeeping values and from them small
+    changes of single attributes (at most 3 each, the overall of the player moves at most %d): better than the team (and than his level) -> up, worse -> down, a little only (full weight from
+    %d minutes). Kept in the data folder, taken into the conversion (development on top of the time shift).""" % (FORM_CAP, FORM_FULL_MIN)
+    sid = _sofa_team(tid, sofa_id)
+    if not sid:
+        return dict(ok=False, msg='No club like "%s" found on Sofascore.' % M.team.get(tid, ''))
+    agg = sofa.team_form(sid, time.mktime(timeshift.BASE + (0, 0, 0, 0, 0, 0)))
+    squad, used, rec = M.players_of(tid), set(), {}
+    for nm, o in agg.items():
+        p = _find(squad, used, nm)
+        if p is not None:
+            used.add(p)
+            rec[p] = dict(o, name=M.name[p], sofa=nm)
+    ok = [r for r in rec.values() if r['n'] >= FORM_MIN_N and r['minutes'] >= FORM_MIN_MIN]
+    if not ok:
+        return dict(ok=False, msg='Not enough matches since 01.09.2026 for this club (at least %d matches and %d minutes per player).' % (FORM_MIN_N, FORM_MIN_MIN))
+    tm = sum(r['rating'] * r['minutes'] for r in ok) / sum(r['minutes'] for r in ok)
+    to = sum(cur_ovr(p) for p, r in rec.items() if r in ok) / len(ok)
+    am = {k: sum(r['asp'][k] * r['minutes'] for r in ok if k in r['asp']) / sum(r['minutes'] for r in ok if k in r['asp']) for k in sofa.ASPECT if any(k in r['asp'] for r in ok)}   # team mean of every aspect
+    for p, r in rec.items():
+        r['team_rating'] = round(tm, 2)
+        r['rating'] = round(r['rating'], 2)
+        r['asp'] = {k: round(v, 2) for k, v in r['asp'].items()}
+        r['attr'], r['ovr_d'] = {}, 0
+        if r in ok:
+            cur, pos = cur_attrs(p), pos_of(p)
+            w = min(1.0, r['minutes'] / FORM_FULL_MIN)
+            perf = r['rating'] - tm - 0.04 * (cur_ovr(p) - to)   # better players are expected to rate higher
+            raw = {}
+            for k, v in r['asp'].items():
+                if (k == 'goalkeeper') == (pos == 0):
+                    for a in ASP_ATTR[k]:
+                        raw[a] = w * (2.5 * (v - am.get(k, 0.0)) + perf)
+            o0 = convert.ovr_model(cur, pos)
+            for f in (1.0, 0.75, 0.5, 0.25, 0.0):   # shrink until the overall moves at most FORM_CAP
+                d = {a: max(-3, min(3, int(round(f * x)))) for a, x in raw.items()}
+                d = {a: v for a, v in d.items() if v and 40 <= cur[a] + v <= 99}
+                if abs(convert.ovr_model(dict(cur, **{a: cur[a] + v for a, v in d.items()}), pos) - o0) <= FORM_CAP + 0.49:
+                    break
+            r['attr'] = d
+            r['ovr_d'] = int(round(convert.ovr_model(dict(cur, **{a: cur[a] + v for a, v in d.items()}), pos))) - int(round(o0))
+        r['perf'] = round(r['rating'] - tm, 2)
+    for p in squad:
+        FORM.pop(p, None)
+    FORM.update(rec)
+    json.dump({str(k): v for k, v in FORM.items()}, open(form_path(), 'w'))
+    MATCH.clear()
+    return dict(ok=True, tid=tid, players=len(rec), changed=sum(1 for r in rec.values() if r['attr']), team_rating=round(tm, 2))
 
 
 MOD = dict(state='')   # GrowthBridge.lua in the modules folder of Sider: 'ok' | 'updated' | 'none'
@@ -1132,7 +1218,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                     cnt['already'] += 1
                     continue
                 # always from the ORIGINAL values (players_base.bin), never from what is in the database now: a second run gives the same result instead of scaling down again
-                p = convert.scale_player(pb, i, pos_of(pid), M.age.get(pid), cur=M.base_attrs.get(pid) or pb.attrs(i), months=mo, pid=pid)
+                p = convert.scale_player(pb, i, pos_of(pid), M.age.get(pid), cur=M.base_attrs.get(pid) or pb.attrs(i), months=mo, pid=pid, form=(FORM.get(pid) or {}).get('attr'))
                 if p['final'] == cur:
                     cnt['already'] += 1
                     continue
@@ -1598,6 +1684,8 @@ class H(BaseHTTPRequestHandler):
                     threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True), body.get('skills', 'off'), bool(body.get('psboost'))), daemon=True).start()
                     time.sleep(0.2)
                     self.send_json(dict(ok=True))
+            elif self.path == '/api/form':
+                self.send_json(form_read(int(body['tid']), body.get('sofa_id')))
             elif self.path == '/api/lineup':
                 self.send_json(lineup_write(int(body['tid']), body.get('sofa_id')) if body.get('write') else lineup_plan(int(body['tid']), body.get('sofa_id')))
             elif self.path == '/api/restart':

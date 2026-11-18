@@ -54,3 +54,45 @@ def last_lineup(team_id):
                rating=(p.get('statistics') or {}).get('rating'), minutes=(p.get('statistics') or {}).get('minutesPlayed')) for p in side.get('players', [])]
     return dict(event=e['id'], date=time.strftime('%d.%m.%Y', time.localtime(e['startTimestamp'])), home=home, opponent=e['awayTeam' if home else 'homeTeam']['name'],
                 formation=side.get('formation'), players=pl)
+
+
+ASPECT = {'pass': 'passValueNormalized', 'dribble': 'dribbleValueNormalized', 'defensive': 'defensiveValueNormalized', 'shot': 'shotValueNormalized', 'goalkeeper': 'goalkeeperValueNormalized'}
+
+
+def team_form(team_id, since):
+    """what every player of the team did in the finished matches since `since` (unix time): {name: dict(n, minutes, rating, goals, assists, asp={aspect: value})}; rating and the
+    aspect values (Sofascore's own per-match value of passing / dribbling / defending / shooting / goalkeeping, 0 = as expected) are weighted by minutes"""
+    evs, page = [], 0
+    while page < 6:
+        d = get('team/%d/events/last/%d' % (team_id, page), 3600)
+        es = d.get('events', [])
+        evs += es
+        if not es or not d.get('hasNextPage') or min(e['startTimestamp'] for e in es) < since:
+            break
+        page += 1
+    out = {}
+    for e in sorted(evs, key=lambda x: x['startTimestamp']):
+        if e.get('status', {}).get('type') != 'finished' or e['startTimestamp'] < since:
+            continue
+        side = get('event/%d/lineups' % e['id']).get('home' if e['homeTeam']['id'] == team_id else 'away') or {}
+        for p in side.get('players', []):
+            st = p.get('statistics') or {}
+            mn = st.get('minutesPlayed') or 0
+            if mn < 1 or st.get('rating') is None:
+                continue
+            o = out.setdefault(p['player']['name'], dict(n=0, minutes=0, rsum=0.0, goals=0, assists=0, asum={}, amin={}))
+            o['n'] += 1
+            o['minutes'] += mn
+            o['rsum'] += st['rating'] * mn
+            o['goals'] += st.get('goals') or 0
+            o['assists'] += st.get('goalAssist') or 0
+            for k, f in ASPECT.items():
+                if st.get(f) is not None:
+                    o['asum'][k] = o['asum'].get(k, 0.0) + st[f] * mn
+                    o['amin'][k] = o['amin'].get(k, 0) + mn
+    for name, o in out.items():
+        o['rating'] = o['rsum'] / o['minutes']
+        o['asp'] = {k: o['asum'][k] / o['amin'][k] for k in o['asum']}
+        for k in ('rsum', 'asum', 'amin'):
+            del o[k]
+    return out
