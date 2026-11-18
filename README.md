@@ -57,6 +57,7 @@ Settings, backups and the copy of your original `Player.bin` are kept in `~/.loc
 By default the tool writes `Player.bin` (for new careers). To change a career that is already running you need **Gaffer** (a separate tool; its bridge is the way into the running game):
 choose *a running Master League* under *Write to*, and the folder of Gaffer's bridge (the one with `growth.csv`; the tool looks for `…/content/ml-immersion/bridge` next to your database).
 The game has to run in the Master League and F7 has to be pressed once (Gaffer's module). Then:
+* the converter ships its own adapted `GrowthBridge.lua` (`flconv/data/`); you give the Sider `modules` folder once, at every start it is compared with the one there and replaced if it differs (the old one is kept in the data folder, `moved/`). Restart the game once after a replacement;
 * the 25 attributes and, when *Profile* / *Skills* are on, **skills, COM styles, playing style and positions** are sent plus height, weight and foot (not names), and only values that differ from the running game. The profile needs the updated `GrowthBridge.lua` module (from this repository's notes: version 1.3 with the fields `B<bit>`, `P<bit>`, `Style`, `Height`, `Weight`, `Foot`); restart the game once after replacing it;
 * writes of more than 20,000 values go **in packages**: the next one is sent when the game has answered the last, the progress is shown, and you can cancel the rest;
 * the write date is the date of the game, and the players of the clubs are the ones of your save (transfers included).

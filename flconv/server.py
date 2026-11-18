@@ -2,6 +2,7 @@
 """FCFL - Stats Converter: converts EA FC (or FMInside / SoFIFA page) stats into the player database of Football Life (Player.bin), for one player, a club, a league or the whole
 database, always with a backup and a check.   python3 server.py [--port 8790] [--data-dir DIR]"""
 import argparse
+import glob
 import hashlib
 import json
 import os
@@ -45,7 +46,7 @@ DEF = dict(
 CFG = dict(DEF)
 LOCK = threading.Lock()
 SET_FILE = os.path.join(DATA, 'settings.json')
-SET = dict(mode='db', dbpath='', date='', bridge='')   # mode: 'db' = the database file, 'ml' = a running Master League through Gaffer
+SET = dict(mode='db', dbpath='', date='', bridge='', modules='')   # mode: 'db' = the database file, 'ml' = a running Master League through Gaffer
 CFG['gaffer'] = 'http://127.0.0.1:8767'
 
 
@@ -939,7 +940,68 @@ def commit(writes, srcs, names=None, profs=None):
     """-> dict(ok, written, backup)"""
     if SET['mode'] == 'ml':
         return ml_write(writes, srcs, profs)
-    return write_all(writes, srcs, names or {}, profs or {})
+    r = write_all(writes, srcs, names or {}, profs or {})
+    if r.get('ok'):
+        r['edit'] = drop_edit()
+    return r
+
+
+def _keep(path, name):
+    """moves/copies a file we are about to remove or replace into DATA/moved (nothing is deleted for good)"""
+    os.makedirs(os.path.join(DATA, 'moved'), exist_ok=True)
+    dst = os.path.join(DATA, 'moved', '%s.%s' % (name, time.strftime('%Y%m%d-%H%M%S')))
+    shutil.copy2(path, dst)
+    return dst
+
+
+def drop_edit():
+    """EDIT00000000 of Football Life 2027 (the game's own file of edited data) overwrites the database at the start: after a write it has to go (a copy is kept in DATA/moved)"""
+    p = os.path.abspath(CFG['pesdb'] or '')
+    sub = os.path.join('Documents', 'SPGAME', 'Football Life', '2027', 'save', 'EDIT00000000')
+    if 'drive_c' in p:   # Wine / Proton prefix
+        c = glob.glob(os.path.join(p.split('drive_c')[0], 'drive_c', 'users', '*', sub))
+    else:
+        c = [os.path.join(os.path.expanduser('~'), sub)]
+    c = [f for f in c if os.path.isfile(f)]
+    if not c:
+        return 'EDIT00000000 not found: if the game has one (save folder of Football Life 2027), delete it yourself, it would overwrite the new values.'
+    try:
+        for f in c:
+            _keep(f, 'EDIT00000000')
+            os.remove(f)
+    except OSError as ex:
+        return 'EDIT00000000 could not be removed (%s): delete it yourself, the game is probably running.' % ex
+    return 'EDIT00000000 removed (copy in %s)' % os.path.join(DATA, 'moved')
+
+
+MOD = dict(state='')   # GrowthBridge.lua in the modules folder of Sider: 'ok' | 'updated' | 'none'
+
+
+def modules_dir():
+    if SET.get('modules'):
+        return SET['modules']
+    b = bridge_dir()   # .../SiderAddons/content/ml-immersion/bridge -> .../SiderAddons/modules
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(b))), 'modules') if b else ''
+
+
+def sync_module():
+    """our adapted GrowthBridge.lua (data/GrowthBridge.lua) must be the one in the modules folder: checked at the start and when the folders change, replaced if it differs"""
+    d = modules_dir()
+    dst = os.path.join(d, 'GrowthBridge.lua') if d else ''
+    if not d or not os.path.isdir(d):
+        MOD['state'] = 'none'
+        return
+    src = os.path.join(HERE, 'data', 'GrowthBridge.lua')
+    if os.path.isfile(dst) and open(dst, 'rb').read() == open(src, 'rb').read():
+        MOD['state'] = 'ok'
+        return
+    try:
+        if os.path.isfile(dst):
+            _keep(dst, 'GrowthBridge.lua')
+        shutil.copy2(src, dst)
+        MOD['state'] = 'updated'
+    except OSError:
+        MOD['state'] = 'none'
 
 
 JOB = dict(state='idle')
@@ -1298,7 +1360,7 @@ def settings_view():
     br = bridge_dir()
     gd = gaffer_date() if SET['mode'] == 'ml' else None
     return dict(ok=True, mode=SET['mode'], dbpath=SET.get('dbpath'), pesdb=r, db_ok=bool(r), loaded=M is not None, date=SET.get('date') or '', data_dir=DATA,
-                bridge=br, bridge_ok=bool(br and os.path.isfile(os.path.join(br, 'growth.csv'))), gaffer_date=('%02d.%02d.%d' % gd[::-1]) if gd else None,
+                modules=modules_dir(), module=MOD['state'], bridge=br, bridge_ok=bool(br and os.path.isfile(os.path.join(br, 'growth.csv'))), gaffer_date=('%02d.%02d.%d' % gd[::-1]) if gd else None,
                 target='%02d.%02d.%d' % td[::-1], base='01.09.2026', months=months(), players=M.pb.n if M else 0, live=len(live_attrs()) if SET['mode'] == 'ml' else 0)
 
 
@@ -1312,6 +1374,11 @@ def settings_set(body):
             if b and not os.path.isdir(b):
                 return dict(ok=False, msg='This bridge folder does not exist.')
             SET['bridge'] = b
+        if 'modules' in body:
+            m = os.path.expanduser(str(body['modules'] or '').strip().strip('"'))
+            if m and not os.path.isdir(m):
+                return dict(ok=False, msg='This modules folder does not exist.')
+            SET['modules'] = m
         if 'date' in body:
             SET['date'] = str(body['date'] or '')
         if body.get('dbpath') and body['dbpath'] != SET.get('dbpath'):
@@ -1322,6 +1389,8 @@ def settings_set(body):
         os.makedirs(DATA, exist_ok=True)
         json.dump(SET, open(SET_FILE, 'w'))
         CFG['journal'] = journal_path()
+        if SET['mode'] == 'ml':
+            sync_module()
     if ch_db:
         load()
     GDATE['key'] = None
@@ -1492,6 +1561,8 @@ def main():
         SET['dbpath'] = a.db
         settings_load()
     load()
+    if SET['mode'] == 'ml':
+        sync_module()
     url = 'http://127.0.0.1:%d/' % a.port
     print('FCFL - Stats Converter on %s  (%d EA FC players%s)' % (url, len(EA.rows), ', %d players in the database' % M.pb.n if M else ', no database chosen yet'), flush=True)
     try:
