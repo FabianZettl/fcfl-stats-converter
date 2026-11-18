@@ -158,11 +158,12 @@ def parse_fm(text):
     t = re.sub(r'[\u200b-\u200f\u202a-\u202e\u2060\ufeff]', '', t)   # invisible marks that a web page puts around a number
     ls = [x.strip() for x in t.splitlines() if x.strip()]
     lines, i = [], 0
-    while i < len(ls):   # the label and its value on two lines (innerText of the page, instead of the copied text): put them together
-        nx = ls[i + 1] if i + 1 < len(ls) else ''
+    while i < len(ls):   # the label and its value on separate lines (innerText of the page: 'Dribbling', '(preferred)', '70'): put them together
+        k = i + 1 + (1 if i + 1 < len(ls) and re.fullmatch(r'\((?:key|preferred)\)', ls[i + 1]) else 0)
+        nx = ls[k] if k < len(ls) else ''
         if re.fullmatch(r'\d{1,2}(\s*[\u2013-]\s*\d{1,2})?', nx) and not re.search(r'\s\d{1,2}$', ls[i]) and _norm(re.sub(r'\((?:key|preferred)\)', '', ls[i])) in FM_LABELS:
             lines.append(ls[i] + '\t' + nx)
-            i += 2
+            i = k + 1
         else:
             lines.append(ls[i])
             i += 1

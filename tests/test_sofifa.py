@@ -71,4 +71,8 @@ assert S.missing_fm({}, False) and not S.missing_fm(full, True)
 _fm = "Current ability\n51 / 100\nPotential\nDynamic\nFirst Touch (key)\t70\nCrossing (preferred)\t60\nAcceleration\t60\nAggression\t50\n"
 _fm2 = "Current ability\n51 / 100\nPotential\nDynamic\nFirst Touch (key)\n70\nCrossing (preferred)\n60\nAcceleration\n\n60\nAggression\n50\n"
 assert S.parse_fm(_fm) == S.parse_fm(_fm2) and S.parse_fm(_fm2)['Acceleration'] == 60 and S.parse_fm(_fm2)['Crossing'] == 60
+# the real innerText of FMInside: label, optional (preferred) / (key) and the value each on a line of their own
+_fm3 = "Current ability\n51 / 100\nPotential\nDynamic\nTechnical\nCrossing\n\t60\nDribbling\n(preferred)\n\t70\nFirst Touch\n(key)\n\t65\nAggression\n\t50\n"
+r3 = S.parse_fm(_fm3)
+assert r3['Crossing'] == 60 and r3['Dribbling'] == 70 and r3['First Touch'] == 65 and r3['Aggression'] == 50, r3
 print('ok')
