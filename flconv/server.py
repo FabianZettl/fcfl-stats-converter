@@ -50,7 +50,7 @@ DEF = dict(
 CFG = dict(DEF)
 LOCK = threading.Lock()
 SET_FILE = os.path.join(DATA, 'settings.json')
-SET = dict(mode='db', dbpath='', date='', bridge='', modules='', savedir='', edit_manual=False)   # mode: 'db' = the database file, 'ml' = a running Master League through Gaffer
+SET = dict(mode='db', dbpath='', date='', bridge='', modules='', savedir='', edit_manual=False, live=True)   # mode: 'db' = the database file, 'ml' = a running Master League through Gaffer
 CFG['gaffer'] = 'http://127.0.0.1:8767'
 
 
@@ -494,7 +494,7 @@ def sig_of(pid, src, youth):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
-    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0) + 4 * int(bool(YF.get('psboost')))) + '|f%s' % sorted(((FORM.get(pid) or {}).get('attr') or {}).items())).encode()).hexdigest()[:10]
+    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0) + 4 * int(bool(YF.get('psboost')))) + '|f%s' % sorted((form_attr(pid) or {}).items())).encode()).hexdigest()[:10]
 
 
 def jentry(pid, src, att):
@@ -837,7 +837,7 @@ def preview(body):
     want = body.get('target')   # a target typed by the user is the overall AFTER the development: the fit is moved by the difference (the development comes on top of the fit)
     tg = target
     for _ in range(4):
-        p = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'), boost=boost, form=(FORM.get(pid) or {}).get('attr'))
+        p = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'), boost=boost, form=form_attr(pid))
         if want is None or not p.get('ok') or p['ovr_new'] == int(want):
             break
         tg += int(want) - p['ovr_new']
@@ -849,7 +849,7 @@ def preview(body):
         p['assigned'] = True
     if p.get('ok'):
         p['youth'] = yb
-        p['form'] = FORM.get(pid)
+        p['form'] = FORM.get(pid) if SET.get('live', True) else None
         p['age'] = M.age.get(pid)
         p['months'] = mo
         p['date'] = '%02d.%02d.%d' % target_date()[::-1]
@@ -901,7 +901,7 @@ def apply(body):
     for t in body.get('tids') or []:   # whole clubs: every player that is found unambiguously
         pids += [p for p in squad_of(int(t)) if match(p)['status'] == 'ok' and p not in pids]
     report, writes, srcs, names, profs = [], {}, {}, {}, {}
-    sk_n = 0
+    sk_n = fm_n = 0
     for pid in pids:
         ch = choices.get(pid) or {}
         done = not ch and not body.get('force') and (len(pids) > 1) and is_done(pid, body.get('youth', True))[0]
@@ -928,6 +928,8 @@ def apply(body):
         if YF['skills'] != 'off' and p.get('skillset'):
             profs.setdefault(pid, {}).update({k: v['new'] for k, v in p['skillset'].items()})
             sk_n += 1
+        if (p.get('form') or {}).get('attr'):
+            fm_n += 1
         want = dict(p.get('names_ea') or {}) if body.get('ea_names') else {}
         want.update(ch.get('names') or {})
         nm = {k: v for k, v in want.items() if k in plbin.NAME_OFFS and str(v).strip() and str(v) != p['names'].get(k)}
@@ -943,7 +945,7 @@ def apply(body):
             if nm:
                 names[pid] = nm
     if dry or not (writes or names or profs):
-        return dict(ok=True, dry=True, report=report, written=0, profile=len(profs), skills=sk_n)
+        return dict(ok=True, dry=True, report=report, written=0, profile=len(profs), skills=sk_n, form=fm_n)
     r = commit(writes, srcs, names, profs)
     if SET['mode'] == 'ml' and names:
         r['skipped'] = dict(names=len(names))   # names, height, weight and foot are not written into the running game
@@ -1079,6 +1081,11 @@ FORM = {}   # pid -> performance since the date of the data (Sofascore), see for
 ASP_ATTR = {'pass': ('LowPass', 'LoftedPass'), 'dribble': ('Dribbling', 'BallControl', 'TightPossession'), 'defensive': ('DefensiveAwareness', 'BallWinning'),
             'shot': ('Finishing', 'OffensiveAwareness'), 'goalkeeper': ('GKReflexes', 'GKCatching', 'GKAwareness')}
 FORM_MIN_N, FORM_MIN_MIN, FORM_FULL_MIN, FORM_CAP = 3, 270, 900, 2
+
+
+def form_attr(pid):
+    """attribute changes from the performance, when the option 'Live data' is on"""
+    return (FORM.get(pid) or {}).get('attr') if SET.get('live', True) else None
 
 
 def form_path():
@@ -1230,7 +1237,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                     cnt['already'] += 1
                     continue
                 # always from the ORIGINAL values (players_base.bin), never from what is in the database now: a second run gives the same result instead of scaling down again
-                p = convert.scale_player(pb, i, pos_of(pid), M.age.get(pid), cur=M.base_attrs.get(pid) or pb.attrs(i), months=mo, pid=pid, form=(FORM.get(pid) or {}).get('attr'))
+                p = convert.scale_player(pb, i, pos_of(pid), M.age.get(pid), cur=M.base_attrs.get(pid) or pb.attrs(i), months=mo, pid=pid, form=form_attr(pid))
                 if p['final'] == cur:
                     cnt['already'] += 1
                     continue
@@ -1530,7 +1537,7 @@ def settings_view():
     br = bridge_dir()
     gd = gaffer_date() if SET['mode'] == 'ml' else None
     return dict(ok=True, mode=SET['mode'], dbpath=SET.get('dbpath'), pesdb=r, db_ok=bool(r), loaded=M is not None, date=SET.get('date') or '', data_dir=DATA,
-                savedir=SET.get('savedir') or '', edit_manual=bool(SET.get('edit_manual')), modules=modules_dir(), module=MOD['state'], bridge=br, bridge_ok=bool(br and os.path.isfile(os.path.join(br, 'growth.csv'))), gaffer_date=('%02d.%02d.%d' % gd[::-1]) if gd else None,
+                savedir=SET.get('savedir') or '', edit_manual=bool(SET.get('edit_manual')), live_data=bool(SET.get('live', True)), modules=modules_dir(), module=MOD['state'], bridge=br, bridge_ok=bool(br and os.path.isfile(os.path.join(br, 'growth.csv'))), gaffer_date=('%02d.%02d.%d' % gd[::-1]) if gd else None,
                 target='%02d.%02d.%d' % td[::-1], base='01.09.2026', months=months(), players=M.pb.n if M else 0, live=len(live_attrs()) if SET['mode'] == 'ml' else 0)
 
 
@@ -1554,6 +1561,8 @@ def settings_set(body):
             if d and not os.path.isdir(d):
                 return dict(ok=False, msg='This save folder does not exist.')
             SET['savedir'] = d
+        if 'live' in body:
+            SET['live'] = bool(body['live'])
         if 'edit_manual' in body:
             SET['edit_manual'] = bool(body['edit_manual'])
         if 'date' in body:
