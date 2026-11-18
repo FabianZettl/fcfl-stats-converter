@@ -850,6 +850,10 @@ def preview(body):
     if p.get('ok'):
         p['youth'] = yb
         p['form'] = FORM.get(pid) if SET.get('live', True) else None
+        if p['form'] and p['form'].get('attr'):   # the effect on the overall in the real pipeline (after the fit and the development), not rounded
+            nf = {k: v - p['form']['attr'].get(k, 0) for k, v in p['final'].items()}
+            p['form'] = dict(p['form'], ovr_real=round(convert.ovr_model(p['final'], pos_of(pid)) - convert.ovr_model(nf, pos_of(pid)), 2),
+                             ovr_with=convert.ovr_model(p['final'], pos_of(pid)), ovr_without=convert.ovr_model(nf, pos_of(pid)))
         p['age'] = M.age.get(pid)
         p['months'] = mo
         p['date'] = '%02d.%02d.%d' % target_date()[::-1]
@@ -1124,7 +1128,7 @@ def form_read(tid, sofa_id=None):
         r['team_rating'] = round(tm, 2)
         r['rating'] = round(r['rating'], 2)
         r['asp'] = {k: round(v, 2) for k, v in r['asp'].items()}
-        r['attr'], r['ovr_d'] = {}, 0
+        r['attr'], r['ovr_d'] = {}, 0.0
         if r in ok:
             cur, pos = cur_attrs(p), pos_of(p)
             w = min(1.0, r['minutes'] / FORM_FULL_MIN)
@@ -1141,7 +1145,7 @@ def form_read(tid, sofa_id=None):
                 if abs(convert.ovr_model(dict(cur, **{a: cur[a] + v for a, v in d.items()}), pos) - o0) <= FORM_CAP + 0.49:
                     break
             r['attr'] = d
-            r['ovr_d'] = int(round(convert.ovr_model(dict(cur, **{a: cur[a] + v for a, v in d.items()}), pos))) - int(round(o0))
+            r['ovr_d'] = round(convert.ovr_model(dict(cur, **{a: cur[a] + v for a, v in d.items()}), pos) - o0, 2)   # not rounded: the game rounds the overall itself
         r['perf'] = round(r['rating'] - tm, 2)
     for p in squad:
         FORM.pop(p, None)

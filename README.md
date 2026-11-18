@@ -100,7 +100,23 @@ Club view -> *Line-up from Sofascore*: reads the last finished match of the club
 them into `PlayerAssignment.bin` (order and number in `k`; backup in `moved/`, read back and checked). The formation itself is not written. Sofascore does not promise this access: if it stops, only `flconv/sofa.py` has to change.
 
 ## Performance since the date of the data (database and Master League)
-Club view -> *Performance since 01.09.*: reads the finished matches of the club since 01.09.2026 from Sofascore (rating, and Sofascore's own passing / dribbling / defending / shooting / goalkeeping values).
-Per player with at least 3 matches and 270 minutes: rating against the team (and against his level) plus the team-relative aspect values move single attributes (passing -> Low Pass / Lofted Pass, dribbling ->
-Dribbling / Ball Control / Tight Possession, defending -> Defensive Awareness / Ball Winning, shooting -> Finishing / Offensive Awareness, goalkeepers -> GK values), at most 3 per value and the overall at most 2
-(full weight from 900 minutes). Better than the team: up; worse: down. It is applied as development on top of the time shift when the player is converted; the player panel shows matches, rating and every change.
+Club view -> *Performance since 01.09.*: how a player did since the date of the data changes a few of his values, a little. Switch: *Conversion options -> Live data (performance)*.
+
+**Data.** For every finished match since 01.09.2026 Sofascore gives, per player, the minutes, the rating (0-10) and its own values for passing, dribbling, defending, shooting and goalkeeping
+(0 = as expected for the position). Rating and values are averaged weighted by minutes.
+
+**Who counts.** At least 3 matches and 270 minutes. The weight grows with playing time: `w = min(1, minutes / 900)`.
+
+**Against the team.** Ratings of different teams and leagues are not comparable, so everything is measured against the team: `perf = rating - team rating - 0.04 x (overall - team overall)`
+(better players are expected to rate a bit higher), and every aspect value is taken minus the team mean of that aspect. So roughly as many players go up as down, and only clear over- and
+underperformers change.
+
+**Which values move.** `change = round(w x (2.5 x aspect + perf))`, at most 3 per value, only on the attributes of that aspect:
+passing -> Low Pass, Lofted Pass; dribbling -> Dribbling, Ball Control, Tight Possession; defending -> Defensive Awareness, Ball Winning; shooting -> Finishing, Offensive Awareness;
+goalkeeping (keepers only) -> GK Awareness, Catching, Reflexes. Better than the team: up, worse: down.
+
+**The overall hardly moves.** If the overall of the position model would change by more than 2, all changes are scaled down until it changes by 2 at most. In practice: about one player in four
+changes, mostly by 1 per value and 0 or +-1 overall (7 clubs checked: 36 of about 160 players, no overall change above 1).
+
+Example: Michael Olise (Bayern), 13 matches, 1,065 minutes, rating 8.42 against a team rating of 7.34: Low Pass +2, Lofted Pass +2, Dribbling +2, Ball Control +2, Tight Possession +2, Defensive Awareness +1,
+Ball Winning +1, Finishing +1, Offensive Awareness +1, overall +1. It is applied as development on top of the time shift when the player is converted (the player panel shows every step).

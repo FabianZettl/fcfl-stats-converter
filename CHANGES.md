@@ -23,5 +23,8 @@ What is different or new:
 | Height, weight, foot | – | height (8 bit field), weight (7 bit field, kg − 30) and preferred foot (1 bit) of `Player.bin` were located by comparing the file with the EA / FIFPlay data and are written from the EA FC entry or from your own value |
 | Skills and playing styles | – | the bits of the 35 skills, 7 COM playing styles, the playing style (22), weak foot and the positions in `Player.bin` were found by matching every bit of the in-game table (whose layout Gaffer knows) with `Player.bin`; the EA FC PlayStyles are mapped to them (`data/playstyle_map.json`) |
 | Names | – | names and shirt names can be edited or taken from the EA data (common name where there is one) |
+| Live data | – | line-up, bench and shirt numbers of the last match and the performance since 01.09.2026 from Sofascore (unofficial JSON through `curl`, throttled and cached): the line-up goes into `PlayerAssignment.bin`, the performance moves single values a little (see README) |
+| Club view | – | pitch with the starting eleven, team ratings, squad list with line-up, number, overall and form |
+| Running Master League | attributes | also skills, COM styles, playing style, positions, height, weight and foot, through a `GrowthBridge.lua` that the tool ships and checks in the Sider modules folder |
 
 Everything in `flconv/lib/poscal.py`, `gkcal.py` and `ovr_weights_fl27.json` was fitted on one database (Football Life 2027) and is specific to it.
