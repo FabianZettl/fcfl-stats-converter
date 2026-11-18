@@ -1,4 +1,4 @@
-"""Sofascore (unofficial JSON, no key): the last match of a team with its line-up and shirt numbers. Plain `curl` (urllib is turned away), at most one call every 0.5 s, every answer is
+"""Sofascore (unofficial JSON, no key): the last match of a team with its line-up and shirt numbers. Plain `curl` (urllib is turned away), at most one call per second, a pause of ten minutes after a 403/429, every answer is
 cached in the data folder (a finished match never changes). shortcut: nothing here is promised by Sofascore, if the calls stop working the module is the only place to fix."""
 import hashlib
 import json
@@ -9,6 +9,7 @@ import time
 BASE = 'https://api.sofascore.com/api/v1/'
 CACHE = [os.path.join(os.path.expanduser('~'), '.cache', 'fl-stats-converter-sofa')]
 _last = [0.0]
+_blocked = [0.0]
 
 
 def get(path, ttl=None):
@@ -17,14 +18,21 @@ def get(path, ttl=None):
     f = os.path.join(CACHE[0], hashlib.md5(path.encode()).hexdigest() + '.json')
     if os.path.isfile(f) and (ttl is None or time.time() - os.path.getmtime(f) < ttl):
         return json.load(open(f, encoding='utf-8'))
-    time.sleep(max(0.0, 0.5 - (time.time() - _last[0])))
+    if time.time() < _blocked[0]:
+        raise OSError('Sofascore is turning requests away (HTTP 403). Not asking again for a few minutes; try later, or enter the link of the club.')
+    time.sleep(max(0.0, 1.0 - (time.time() - _last[0])))
     try:
-        r = subprocess.run(['curl', '-s', '-f', '-m', '25', BASE + path], capture_output=True)
+        r = subprocess.run(['curl', '-s', '-m', '25', '-w', '\n%{http_code}', BASE + path], capture_output=True)
     except FileNotFoundError:
         raise OSError('curl was not found (needed to ask Sofascore)')
     _last[0] = time.time()
-    if r.returncode:
-        raise OSError('Sofascore did not answer (%s, curl %d)' % (path, r.returncode))
+    body, _, code = r.stdout.rpartition(b'\n')
+    if code != b'200':
+        if code in (b'403', b'429'):
+            _blocked[0] = time.time() + 600   # do not hammer a server that says no
+            raise OSError('Sofascore is turning requests away (HTTP %s). Try again in a few minutes, or enter the link of the club.' % code.decode())
+        raise OSError('Sofascore did not answer (%s, HTTP %s)' % (path, code.decode() or 'none'))
+    r.stdout = body
     d = json.loads(r.stdout)
     json.dump(d, open(f, 'w', encoding='utf-8'))
     return d
@@ -96,3 +104,10 @@ def team_form(team_id, since):
         for k in ('rsum', 'asum', 'amin'):
             del o[k]
     return out
+
+
+def team_id_from_link(text):
+    """https://www.sofascore.com/football/team/arsenal/42 (or just 42) -> 42, None when it is neither"""
+    t = str(text or '').strip().split('#')[0].split('?')[0].rstrip('/')
+    last = t.rsplit('/', 1)[-1]
+    return int(last) if last.isdigit() and ('/' not in t or 'sofascore' in t) else None

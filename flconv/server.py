@@ -995,11 +995,26 @@ def _same(a, b):
     return bool(a and b) and (a == b or set(a) <= set(b) or set(b) <= set(a) or (a[0][:1] == b[0][:1] and difflib.SequenceMatcher(None, a[-1], b[-1]).ratio() >= 0.85))
 
 
+def _sofa_file():
+    return os.path.join(DATA, 'sofa-teams-%s.json' % db_key())
+
+
 def _sofa_team(tid, sofa_id=None):
-    """Sofascore id of the club (the name is searched; None when nothing fits)"""
+    """Sofascore id of the club: a link / id the user gave (kept for later), else the name is searched (None when nothing fits)"""
     sofa.CACHE[0] = os.path.join(DATA, 'sofa')
+    try:
+        mem = json.load(open(_sofa_file()))
+    except Exception:
+        mem = {}
     if sofa_id:
-        return int(sofa_id)
+        sid = sofa.team_id_from_link(sofa_id)
+        if sid is None:
+            raise ValueError('That is not a Sofascore club link (like https://www.sofascore.com/football/team/arsenal/42).')
+        mem[str(tid)] = sid
+        json.dump(mem, open(_sofa_file(), 'w'))
+        return sid
+    if str(tid) in mem:
+        return mem[str(tid)]
     name = M.team.get(tid, '')
     words = [w for w in fcdb.fold(name).split() if len(w) > 2 and w not in ('fc', 'cf', 'sc', 'afc')]
     cand = sofa.find_team(name) or sofa.find_team(' '.join(words[:2]))
@@ -1018,7 +1033,7 @@ def lineup_plan(tid, sofa_id=None):
     name = M.team.get(tid, '')
     sofa_id = _sofa_team(tid, sofa_id)
     if not sofa_id:
-        return dict(ok=False, msg='No club like "%s" found on Sofascore.' % name)
+        return dict(ok=False, msg='No club like "%s" found on Sofascore: enter its link.' % name)
     m = sofa.last_lineup(int(sofa_id))
     if not m or not m['players']:
         return dict(ok=False, msg='Sofascore has no line-up for the last match of this club.')
@@ -1115,7 +1130,7 @@ def form_read(tid, sofa_id=None):
     %d minutes). Kept in the data folder, taken into the conversion (development on top of the time shift).""" % (FORM_CAP, FORM_FULL_MIN)
     sid = _sofa_team(tid, sofa_id)
     if not sid:
-        return dict(ok=False, msg='No club like "%s" found on Sofascore.' % M.team.get(tid, ''))
+        return dict(ok=False, msg='No club like "%s" found on Sofascore: enter its link.' % M.team.get(tid, ''))
     agg = sofa.team_form(sid, time.mktime(timeshift.BASE + (0, 0, 0, 0, 0, 0)))
     squad, used, rec = M.players_of(tid), set(), {}
     for nm, o in agg.items():
@@ -1717,10 +1732,18 @@ class H(BaseHTTPRequestHandler):
                     threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True), body.get('skills', 'off'), bool(body.get('psboost'))), daemon=True).start()
                     time.sleep(0.2)
                     self.send_json(dict(ok=True))
-            elif self.path == '/api/form':
-                self.send_json(form_read(int(body['tid']), body.get('sofa_id')))
-            elif self.path == '/api/lineup':
-                self.send_json(lineup_write(int(body['tid']), body.get('sofa_id')) if body.get('write') else lineup_plan(int(body['tid']), body.get('sofa_id')))
+            elif self.path in ('/api/form', '/api/lineup'):
+                try:
+                    t, sid = int(body['tid']), body.get('sofa_id')
+                    if self.path == '/api/form':
+                        r = form_read(t, sid)
+                    else:
+                        r = lineup_write(t, sid) if body.get('write') else lineup_plan(t, sid)
+                    if not r.get('ok') and 'Sofascore' in str(r.get('msg')):
+                        r['link'] = True
+                    self.send_json(r)
+                except (OSError, ValueError) as ex:
+                    self.send_json(dict(ok=False, msg=str(ex), link=True))
             elif self.path == '/api/restart':
                 self.send_json(dict(ok=True))
                 threading.Timer(0.5, restart).start()
