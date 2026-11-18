@@ -494,7 +494,7 @@ def sig_of(pid, src, youth):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
-    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0) + 4 * int(bool(YF.get('psboost')))) + '|f%s' % sorted((form_attr(pid) or {}).items())).encode()).hexdigest()[:10]
+    return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0) + 4 * int(bool(YF.get('psboost')))) + '|f%s' % sorted((form_attr(pid) or {}).items()) + '|d%.2f' % form_dev(pid)).encode()).hexdigest()[:10]
 
 
 def jentry(pid, src, att):
@@ -837,7 +837,7 @@ def preview(body):
     want = body.get('target')   # a target typed by the user is the overall AFTER the development: the fit is moved by the difference (the development comes on top of the fit)
     tg = target
     for _ in range(4):
-        p = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'), boost=boost, form=form_attr(pid))
+        p = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'), boost=boost, form=form_attr(pid), devf=form_dev(pid))
         if want is None or not p.get('ok') or p['ovr_new'] == int(want):
             break
         tg += int(want) - p['ovr_new']
@@ -850,10 +850,10 @@ def preview(body):
     if p.get('ok'):
         p['youth'] = yb
         p['form'] = FORM.get(pid) if SET.get('live', True) else None
-        if p['form'] and p['form'].get('attr'):   # the effect on the overall in the real pipeline (after the fit and the development), not rounded
-            nf = {k: v - p['form']['attr'].get(k, 0) for k, v in p['final'].items()}
-            p['form'] = dict(p['form'], ovr_real=round(convert.ovr_model(p['final'], pos_of(pid)) - convert.ovr_model(nf, pos_of(pid)), 2),
-                             ovr_with=convert.ovr_model(p['final'], pos_of(pid)), ovr_without=convert.ovr_model(nf, pos_of(pid)))
+        if p['form'] and (p['form'].get('attr') or p['form'].get('devf', 1.0) != 1.0):   # the exact effect on the overall (not rounded): the same conversion without the live data
+            p0 = convert.preview(M.pb, i, pos_of(pid), EA, row, fm, tg, CFG['fmcal'], cur=cur_attrs(pid), months=mo, age=age_base(pid), pid=pid, edits=body.get('edits'), boost=boost)
+            o1, o0 = convert.ovr_model(p['final'], pos_of(pid)), convert.ovr_model(p0['final'], pos_of(pid))
+            p['form'] = dict(p['form'], ovr_real=round(o1 - o0, 2), ovr_with=o1, ovr_without=o0)
         p['age'] = M.age.get(pid)
         p['months'] = mo
         p['date'] = '%02d.%02d.%d' % target_date()[::-1]
@@ -1092,6 +1092,11 @@ def form_attr(pid):
     return (FORM.get(pid) or {}).get('attr') if SET.get('live', True) else None
 
 
+def form_dev(pid):
+    """how much of the development by time counts (1 = as without live data), see form_read"""
+    return (FORM.get(pid) or {}).get('devf', 1.0) if SET.get('live', True) else 1.0
+
+
 def form_path():
     return os.path.join(DATA, 'form-%s.json' % db_key())
 
@@ -1128,11 +1133,14 @@ def form_read(tid, sofa_id=None):
         r['team_rating'] = round(tm, 2)
         r['rating'] = round(r['rating'], 2)
         r['asp'] = {k: round(v, 2) for k, v in r['asp'].items()}
-        r['attr'], r['ovr_d'] = {}, 0.0
+        r['attr'], r['ovr_d'], r['devf'] = {}, 0.0, 1.0
         if r in ok:
             cur, pos = cur_attrs(p), pos_of(p)
             w = min(1.0, r['minutes'] / FORM_FULL_MIN)
             perf = r['rating'] - tm - 0.04 * (cur_ovr(p) - to)   # better players are expected to rate higher
+            z = max(-1.0, min(1.0, perf / 0.5))   # -1 .. +1: under- / overperforms his values (0 = confirms them)
+            sg = 1 if timeshift.rate(age_base(p) or 25.0, 1, pos == 0) > 0 else -1   # growing or declining by age
+            r['devf'] = round(1 + 0.5 * w * z * sg, 2)   # growth counts more when he overperforms, decline counts less; the other way round when he underperforms
             raw = {}
             for k, v in r['asp'].items():
                 if (k == 'goalkeeper') == (pos == 0):
@@ -1241,7 +1249,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                     cnt['already'] += 1
                     continue
                 # always from the ORIGINAL values (players_base.bin), never from what is in the database now: a second run gives the same result instead of scaling down again
-                p = convert.scale_player(pb, i, pos_of(pid), M.age.get(pid), cur=M.base_attrs.get(pid) or pb.attrs(i), months=mo, pid=pid, form=form_attr(pid))
+                p = convert.scale_player(pb, i, pos_of(pid), M.age.get(pid), cur=M.base_attrs.get(pid) or pb.attrs(i), months=mo, pid=pid, form=form_attr(pid), devf=form_dev(pid))
                 if p['final'] == cur:
                     cnt['already'] += 1
                     continue

@@ -108,9 +108,9 @@ def fm_apply(cal, attr, v):
     return max(40, min(99, int(round(c['b'] * v + c['a'] + (1 - c['b']) * 0))))
 
 
-def finish(fitted, pos, age, rating, months, pid, edits, form=None):
+def finish(fitted, pos, age, rating, months, pid, edits, form=None, devf=1.0):
     """development to the date of the write, then the values the user typed"""
-    sh = timeshift.shift(fitted, pos, age if age is not None else 25.0, rating, months, pid, tw=sum(x for x in wvec(pos)[:25] if x > 0) or 1.7) if months else dict(fitted)
+    sh = timeshift.shift(fitted, pos, age if age is not None else 25.0, rating, months * devf, pid, tw=sum(x for x in wvec(pos)[:25] if x > 0) or 1.7) if months else dict(fitted)
     for a, v in (form or {}).items():   # performance since the date of the data (Sofascore)
         if a in sh:
             sh[a] = max(40, min(99, sh[a] + int(v)))
@@ -120,7 +120,7 @@ def finish(fitted, pos, age, rating, months, pid, edits, form=None):
     return sh
 
 
-def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_calib=None, cur=None, months=0, age=None, pid=None, edits=None, boost=None, form=None):
+def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_calib=None, cur=None, months=0, age=None, pid=None, edits=None, boost=None, form=None, devf=1.0):
     """-> dict(ok, rows, steps, ...) for the record i of Player.bin; cur: current values (default: Player.bin), months: development to the date of the write"""
     gk = pos == 0
     cur = cur or pb.attrs(i)
@@ -184,7 +184,7 @@ def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_cali
                          src=e.get('src'), rule=e.get('rule'), model=bool(e.get('model'))))
     tgt = target if target is not None else src_ovr
     fitted0, ch = (fit_overall(fin0, pos, tgt, lock=set(boost or ())) if tgt is not None else (fin0, {a: 0 for a in AB}))
-    fitted = finish(fitted0, pos, age, tgt if tgt is not None else ovr_model(fitted0, pos), months, pid or 0, edits, form)
+    fitted = finish(fitted0, pos, age, tgt if tgt is not None else ovr_model(fitted0, pos), months, pid or 0, edits, form, devf)
     w = wvec(pos)
     for r in rows:
         r['fit'] = ch[r['attr']]
@@ -211,14 +211,14 @@ def age_offset(age):
     return 3.3
 
 
-def scale_player(pb, i, pos, age, cur=None, months=0, pid=None, edits=None, form=None):
+def scale_player(pb, i, pos, age, cur=None, months=0, pid=None, edits=None, form=None, devf=1.0):
     """a player that is not in the EA FC export: the profile stays, the level goes down by the usual difference of the game to EA FC (fit to the overall of the model)
     -> dict like preview()"""
     cur = cur or pb.attrs(i)
     o0 = ovr_model(cur, pos)
     tgt = max(40, int(round(o0 - age_offset(age))))
     fitted0, ch = fit_overall(cur, pos, tgt)
-    fitted = finish(fitted0, pos, age, tgt, months, pid or 0, edits, form)
+    fitted = finish(fitted0, pos, age, tgt, months, pid or 0, edits, form, devf)
     w = wvec(pos)
     rows = [dict(attr=a, cur=cur[a], final=fitted[a], fit=ch[a], oe=round(w[AB.index(a)] * (fitted[a] - cur[a]), 2)) for a in AB]
     return dict(ok=True, rows=rows, final={a: fitted[a] for a in AB}, ovr_cur=int(round(o0)), ovr_new=int(round(ovr_model(fitted, pos))), ovr_target=tgt, source='scaled',

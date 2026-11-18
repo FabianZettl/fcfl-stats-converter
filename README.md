@@ -115,6 +115,11 @@ underperformers change.
 passing -> Low Pass, Lofted Pass; dribbling -> Dribbling, Ball Control, Tight Possession; defending -> Defensive Awareness, Ball Winning; shooting -> Finishing, Offensive Awareness;
 goalkeeping (keepers only) -> GK Awareness, Catching, Reflexes. Better than the team: up, worse: down.
 
+**Development by time is weighted by the performance.** The time shift (age curve, e.g. +2.5 months) is only an expectation. With Sofascore data the performance says whether he *confirms* it, *overperforms* or
+*underperforms* his values (`z = perf / 0.5`, limited to -1..+1): the time development counts `x (1 + 0.5 x w x z)` for a player who still grows and `x (1 - 0.5 x w x z)` for one who declines. A growing player who
+overperforms grows more (up to x1.5), one who underperforms less (down to x0.5); a declining player who overperforms declines less, one who underperforms declines more. Confirming his values (z near 0) changes nothing.
+The player panel says which of the three it is and what the time development counts.
+
 **The overall hardly moves.** If the overall of the position model would change by more than 2, all changes are scaled down until it changes by 2 at most. In practice: about one player in four
 changes, mostly by 1 per value and 0 or +-1 overall (7 clubs checked: 36 of about 160 players, no overall change above 1).
 
