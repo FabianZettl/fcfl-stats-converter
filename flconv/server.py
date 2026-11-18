@@ -741,7 +741,9 @@ def find(q, limit=12):
 def club_view(tid, youth=True):
     pids = squad_of(tid)
     pl = [pl_row(p, youth) for p in pids]
-    pl.sort(key=lambda x: -x['ovr'])
+    for x in pl:
+        x['slot'], x['no'] = M.lineup.get((tid, x['pid']), (None, None))
+    pl.sort(key=lambda x: (x['slot'] is None, x['slot'] if x['slot'] is not None else 0, -x['ovr']))   # the line-up of the database: starting eleven first
     return dict(ok=True, tid=tid, name=M.team.get(tid, ''), league=(M.leagues.get(M.league_of.get(tid)) or {}).get('name'), players=pl, found=sum(1 for x in pl if x['status'] == 'ok'), total=len(pl),
                 done=sum(1 for x in pl if x.get('done')))
 

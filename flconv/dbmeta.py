@@ -112,8 +112,10 @@ class Meta:
         pa = _unz(os.path.join(self.pesdb, 'PlayerAssignment.bin'))
         self.squad = {}   # team id -> [player ids]
         self.club_of = {}
+        self.lineup = {}   # (team id, player id) -> (order in the line-up 0..34: 0..10 start, shirt number); found by comparing 800 teams: order 0 is always the GK, the first 11 hold exactly one
         for i in range(len(pa) // 16):
             _x, pid, tid, _k = struct.unpack_from('<4I', pa, i * 16)
+            self.lineup[(tid, pid)] = ((_k >> 10) & 63, (_k & 127) + 1)
             self.squad.setdefault(tid, []).append(pid)
             if tid in self.league_of and pid not in self.club_of:
                 self.club_of[pid] = tid
