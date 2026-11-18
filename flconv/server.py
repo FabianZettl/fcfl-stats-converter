@@ -751,7 +751,11 @@ def club_view(tid, youth=True):
         f = FORM.get(x['pid'])
         x['form'] = dict(n=f['n'], rating=f['rating'], ovr_d=f['ovr_d']) if f else None
     pl.sort(key=lambda x: (x['slot'] is None, x['slot'] if x['slot'] is not None else 0, -x['ovr']))   # the line-up of the database: starting eleven first
-    return dict(ok=True, tid=tid, name=M.team.get(tid, ''), league=(M.leagues.get(M.league_of.get(tid)) or {}).get('name'), players=pl, found=sum(1 for x in pl if x['status'] == 'ok'), total=len(pl),
+    try:
+        fm = json.load(open(os.path.join(DATA, 'formations-%s.json' % db_key()))).get(str(tid))
+    except Exception:
+        fm = None
+    return dict(ok=True, tid=tid, formation=fm, name=M.team.get(tid, ''), league=(M.leagues.get(M.league_of.get(tid)) or {}).get('name'), players=pl, found=sum(1 for x in pl if x['status'] == 'ok'), total=len(pl),
                 done=sum(1 for x in pl if x.get('done')))
 
 
@@ -1060,6 +1064,14 @@ def lineup_write(tid, sofa_id=None):
             shutil.copy2(bk, path)
             M._assign()
             return dict(ok=False, msg='Check after writing failed, the backup was restored.')
+    if pl.get('formation'):   # for the picture of the club (the formation of the database itself is not decoded)
+        fp = os.path.join(DATA, 'formations-%s.json' % db_key())
+        try:
+            fo = json.load(open(fp))
+        except Exception:
+            fo = {}
+        fo[str(tid)] = pl['formation']
+        json.dump(fo, open(fp, 'w'))
     return dict(ok=True, written=len(want), backup=bk, edit=drop_edit())
 
 
