@@ -2,16 +2,19 @@
 """FCFL - Stats Converter: converts EA FC (or FMInside / SoFIFA page) stats into the player database of Football Life (Player.bin), for one player, a club, a league or the whole
 database, always with a backup and a check.   python3 server.py [--port 8790] [--data-dir DIR]"""
 import argparse
+import difflib
 import glob
 import hashlib
 import json
 import os
 import shutil
+import struct
 import sys
 import threading
 import time
 import urllib.parse
 import urllib.request
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +28,7 @@ import dbmeta  # noqa: E402
 import fcdb  # noqa: E402
 import fmcal  # noqa: E402
 import plbin  # noqa: E402
+import sofa  # noqa: E402
 
 def default_data_dir():
     if os.environ.get('FLCONV_DATA'):
@@ -972,6 +976,76 @@ def drop_edit():
     return 'EDIT00000000 removed (copy in %s)' % os.path.join(DATA, 'moved')
 
 
+def _same(a, b):
+    a, b = fcdb.fold(a).split(), fcdb.fold(b).split()
+    return bool(a and b) and (a == b or set(a) <= set(b) or set(b) <= set(a) or (a[0][:1] == b[0][:1] and difflib.SequenceMatcher(None, a[-1], b[-1]).ratio() >= 0.85))
+
+
+def lineup_plan(tid, sofa_id=None):
+    """last match of the club on Sofascore -> the line-up for PlayerAssignment.bin: the eleven, then the bench (in Sofascore's order), then the rest of the squad in the old order; shirt numbers of the match"""
+    sofa.CACHE[0] = os.path.join(DATA, 'sofa')
+    name = M.team.get(tid, '')
+    if not sofa_id:
+        words = [w for w in fcdb.fold(name).split() if len(w) > 2 and w not in ('fc', 'cf', 'sc', 'afc')]
+        cand = sofa.find_team(name) or sofa.find_team(' '.join(words[:2]))
+        hit = [c for c in cand if set(words) & set(fcdb.fold(c[1]).split())]
+        if not hit:
+            return dict(ok=False, msg='No club like "%s" found on Sofascore.' % name)
+        sofa_id = hit[0][0]
+    m = sofa.last_lineup(int(sofa_id))
+    if not m or not m['players']:
+        return dict(ok=False, msg='Sofascore has no line-up for the last match of this club.')
+    squad = M.players_of(tid)
+    old = {p: M.lineup.get((tid, p), (99, 0)) for p in squad}
+    used, rows, miss = set(), [], []
+    for sp in sorted(m['players'], key=lambda x: x['sub']):   # stable: the eleven first, in Sofascore's order
+        c = [p for p in squad if p not in used and fcdb.fold(M.name[p]) == fcdb.fold(sp['name'])] or [p for p in squad if p not in used and _same(M.name[p], sp['name'])]
+        if len(c) == 1 and sp['no']:
+            used.add(c[0])
+            rows.append(dict(pid=c[0], name=M.name[c[0]], sofa=sp['name'], no=int(sp['no']), start=not sp['sub'], pos=sp['pos']))
+        else:
+            miss.append(sp['name'])
+    free = {r['no'] for r in rows}
+    for p in sorted((p for p in squad if p not in used), key=lambda p: old[p][0]):   # not in the match: place after the others, keep his number if it is free
+        n = old[p][1] if old[p][1] and old[p][1] not in free else next(k for k in range(40, 129) if k not in free)
+        free.add(n)
+        rows.append(dict(pid=p, name=M.name[p], sofa='', no=n, start=False, pos=None))
+    for k, r in enumerate(rows):
+        r['order'] = k
+    if rows[0]['pos'] not in ('G', None) or sum(1 for r in rows[:11] if r['pos'] == 'G') != 1:
+        return dict(ok=False, msg='The eleven of Sofascore does not have exactly one goalkeeper first: not written.')
+    return dict(ok=True, tid=tid, sofa_id=int(sofa_id), club=name, date=m['date'], opponent=m['opponent'], formation=m['formation'], rows=rows, missing=miss)
+
+
+def lineup_write(tid, sofa_id=None):
+    if SET['mode'] == 'ml':
+        return dict(ok=False, msg='Line-ups are written into the database file only: switch to "the database file".')
+    pl = lineup_plan(tid, sofa_id)
+    if not pl.get('ok'):
+        return pl
+    path = os.path.join(CFG['pesdb'], 'PlayerAssignment.bin')
+    with LOCK:
+        raw = open(path, 'rb').read()
+        data = bytearray(zlib.decompress(raw[16:]))
+        want = {r['pid']: ((r['order'] << 10) | (r['no'] - 1)) for r in pl['rows']}
+        for i in range(len(data) // 16):
+            _x, pid, t, k = struct.unpack_from('<4I', data, i * 16)
+            if t == tid and pid in want:
+                struct.pack_into('<I', data, i * 16 + 12, (k & ~((63 << 10) | 127)) | want[pid])   # the other bits of k stay
+        bk = _keep(path, 'PlayerAssignment.bin')
+        z = zlib.compress(bytes(data), 9)
+        tmp = path + '.tmp'
+        open(tmp, 'wb').write(raw[:8] + struct.pack('<II', len(z), len(data)) + z)
+        os.replace(tmp, path)
+        M._assign()
+        bad = [p for p in want if M.lineup.get((tid, p)) != (want[p] >> 10, (want[p] & 127) + 1)]
+        if bad:
+            shutil.copy2(bk, path)
+            M._assign()
+            return dict(ok=False, msg='Check after writing failed, the backup was restored.')
+    return dict(ok=True, written=len(want), backup=bk, edit=drop_edit())
+
+
 MOD = dict(state='')   # GrowthBridge.lua in the modules folder of Sider: 'ok' | 'updated' | 'none'
 
 
@@ -1524,6 +1598,8 @@ class H(BaseHTTPRequestHandler):
                     threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True), body.get('skills', 'off'), bool(body.get('psboost'))), daemon=True).start()
                     time.sleep(0.2)
                     self.send_json(dict(ok=True))
+            elif self.path == '/api/lineup':
+                self.send_json(lineup_write(int(body['tid']), body.get('sofa_id')) if body.get('write') else lineup_plan(int(body['tid']), body.get('sofa_id')))
             elif self.path == '/api/settings':
                 self.send_json(settings_set(body))
             elif self.path == '/api/ml/cancel':

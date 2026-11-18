@@ -94,3 +94,7 @@ You can use another export with `--csv file.csv` (same columns, see DATA.md).
 ## License
 
 GPL-3.0, see [LICENSE](LICENSE). The conversion formulas are derived from the *PES Stats Converter* by moth1995 (GPL-3.0), see [CHANGES.md](CHANGES.md).
+
+## Line-up from Sofascore (database mode)
+Club view -> *Line-up from Sofascore*: reads the last finished match of the club (unofficial Sofascore JSON through `curl`, throttled, cached in the data folder `sofa/`), shows the eleven, the bench and the shirt numbers and writes
+them into `PlayerAssignment.bin` (order and number in `k`; backup in `moved/`, read back and checked). The formation itself is not written. Sofascore does not promise this access: if it stops, only `flconv/sofa.py` has to change.
