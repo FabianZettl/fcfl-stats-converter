@@ -135,6 +135,12 @@ def ml_fields(pr):
         f['Style'] = plbin.STYLES.index(pr['playing_style'])
     if 'positions' in pr:
         f.update({'P%d' % l: max(0, min(2, int(v))) for l, v in zip(IG_POS, pr['positions'])})
+    if 'height' in pr:
+        f['Height'] = int(pr['height'])
+    if 'weight' in pr:
+        f['Weight'] = int(pr['weight'])
+    if 'foot' in pr:
+        f['Foot'] = int(pr['foot'] == 'Left')
     return f
 
 
@@ -149,6 +155,7 @@ def live_x(pid):
     f = {'B%d' % x: (v >> x) & 1 for x in list(IG_SKILL.values()) + list(IG_COM.values())}
     f.update({'P%d' % l: (v >> l) & 3 for l in IG_POS})
     f['Style'] = (b[0x1D] >> 3) & 31
+    f.update(Height=b[0], Weight=b[1], Foot=b[23] >> 7)
     return f
 
 
