@@ -16,7 +16,7 @@ Du gibst den Pfad zu deiner `Player.bin` an, das Tool vergleicht deine Datenbank
 * **Größe, Gewicht und starker Fuß** des EA-Eintrags werden mitgeschrieben (Schalter in der Seitenleiste), mit Icons in der Profil-Karte des Spielers, eigene Werte sind möglich.
 * **Skills, COM-Stile und Playing Style** aus den EA-FC-PlayStyles (experimentell, Schalter in der Seitenleiste: off / add / replace), nach der Tabelle in [docs/PLAYSTYLE_MAPPING.md](docs/PLAYSTYLE_MAPPING.md).
 * **Schreiben in eine laufende Master League** (optional, braucht **Gaffer**): die 25 Attribute und (mit Profil/Skills) Skills, COM-Stile, Spielstil, Positionen sowie Größe, Gewicht und Fuß gehen über die Bridge von Gaffer ins Spiel (braucht das aktualisierte Modul GrowthBridge.lua 1.3, Spiel danach neu starten), in Paketen mit Fortschrittsbalken (siehe englische README).
-* **Datenbank-Modus**: nach dem Schreiben wird `EDIT00000000` von Football Life 2027 aus dem Save-Ordner entfernt (Kopie im Datenordner, `moved/`), sonst überschreibt das Spiel die neuen Werte. Der Converter liefert sein eigenes `GrowthBridge.lua` mit und gleicht es beim Start mit dem Sider-`modules`-Ordner ab.
+* **Datenbank-Modus**: nach dem Schreiben wird `EDIT00000000` aus dem Save-Ordner von Football Life 2027 entfernt (den Ordner gibst du an, oder du löschst die Datei selbst) (Kopie im Datenordner, `moved/`), sonst überschreibt das Spiel die neuen Werte. Der Converter liefert sein eigenes `GrowthBridge.lua` mit und gleicht es beim Start mit dem Sider-`modules`-Ordner ab.
 * **Suche** nach Spielern und Teams in der Seitenleiste (ohne Umweg über das Liga-Menü).
 * Ordnerauswahl, Backups mit Wiederherstellung per Klick, bereits konvertierte Spieler werden markiert und übersprungen.
 

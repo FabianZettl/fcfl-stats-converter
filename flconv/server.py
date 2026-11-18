@@ -46,7 +46,7 @@ DEF = dict(
 CFG = dict(DEF)
 LOCK = threading.Lock()
 SET_FILE = os.path.join(DATA, 'settings.json')
-SET = dict(mode='db', dbpath='', date='', bridge='', modules='')   # mode: 'db' = the database file, 'ml' = a running Master League through Gaffer
+SET = dict(mode='db', dbpath='', date='', bridge='', modules='', savedir='', edit_manual=False)   # mode: 'db' = the database file, 'ml' = a running Master League through Gaffer
 CFG['gaffer'] = 'http://127.0.0.1:8767'
 
 
@@ -955,20 +955,16 @@ def _keep(path, name):
 
 
 def drop_edit():
-    """EDIT00000000 of Football Life 2027 (the game's own file of edited data) overwrites the database at the start: after a write it has to go (a copy is kept in DATA/moved)"""
-    p = os.path.abspath(CFG['pesdb'] or '')
-    sub = os.path.join('Documents', 'SPGAME', 'Football Life', '2027', 'save', 'EDIT00000000')
-    if 'drive_c' in p:   # Wine / Proton prefix
-        c = glob.glob(os.path.join(p.split('drive_c')[0], 'drive_c', 'users', '*', sub))
-    else:
-        c = [os.path.join(os.path.expanduser('~'), sub)]
-    c = [f for f in c if os.path.isfile(f)]
-    if not c:
-        return 'EDIT00000000 not found: if the game has one (save folder of Football Life 2027), delete it yourself, it would overwrite the new values.'
+    """EDIT00000000 in the save folder of Football Life 2027 (the one the user gave) overwrites the database at the start: after a write it has to go (a copy is kept in DATA/moved)"""
+    if SET.get('edit_manual'):
+        return 'Remember to delete EDIT00000000 yourself, the game would overwrite the new values with it.'
+    f = os.path.join(SET.get('savedir') or '', 'EDIT00000000')
+    if not os.path.isfile(f):
+        return 'EDIT00000000 not found in the save folder you gave: delete it yourself, it would overwrite the new values.' if SET.get('savedir') else \
+            'No save folder given: delete EDIT00000000 yourself, it would overwrite the new values.'
     try:
-        for f in c:
-            _keep(f, 'EDIT00000000')
-            os.remove(f)
+        _keep(f, 'EDIT00000000')
+        os.remove(f)
     except OSError as ex:
         return 'EDIT00000000 could not be removed (%s): delete it yourself, the game is probably running.' % ex
     return 'EDIT00000000 removed (copy in %s)' % os.path.join(DATA, 'moved')
@@ -1360,7 +1356,7 @@ def settings_view():
     br = bridge_dir()
     gd = gaffer_date() if SET['mode'] == 'ml' else None
     return dict(ok=True, mode=SET['mode'], dbpath=SET.get('dbpath'), pesdb=r, db_ok=bool(r), loaded=M is not None, date=SET.get('date') or '', data_dir=DATA,
-                modules=modules_dir(), module=MOD['state'], bridge=br, bridge_ok=bool(br and os.path.isfile(os.path.join(br, 'growth.csv'))), gaffer_date=('%02d.%02d.%d' % gd[::-1]) if gd else None,
+                savedir=SET.get('savedir') or '', edit_manual=bool(SET.get('edit_manual')), modules=modules_dir(), module=MOD['state'], bridge=br, bridge_ok=bool(br and os.path.isfile(os.path.join(br, 'growth.csv'))), gaffer_date=('%02d.%02d.%d' % gd[::-1]) if gd else None,
                 target='%02d.%02d.%d' % td[::-1], base='01.09.2026', months=months(), players=M.pb.n if M else 0, live=len(live_attrs()) if SET['mode'] == 'ml' else 0)
 
 
@@ -1379,6 +1375,13 @@ def settings_set(body):
             if m and not os.path.isdir(m):
                 return dict(ok=False, msg='This modules folder does not exist.')
             SET['modules'] = m
+        if 'savedir' in body:
+            d = os.path.expanduser(str(body['savedir'] or '').strip().strip('"'))
+            if d and not os.path.isdir(d):
+                return dict(ok=False, msg='This save folder does not exist.')
+            SET['savedir'] = d
+        if 'edit_manual' in body:
+            SET['edit_manual'] = bool(body['edit_manual'])
         if 'date' in body:
             SET['date'] = str(body['date'] or '')
         if body.get('dbpath') and body['dbpath'] != SET.get('dbpath'):
