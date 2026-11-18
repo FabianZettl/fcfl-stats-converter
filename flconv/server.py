@@ -1578,7 +1578,7 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get('Content-Length') or 0)
         body = json.loads(self.rfile.read(n) or b'{}')
         try:
-            if M is None and self.path != '/api/settings':
+            if M is None and self.path not in ('/api/settings', '/api/restart'):
                 self.send_json(dict(ok=False, msg='Choose the folder with Player.bin first.'))
                 return
             if self.path == '/api/preview':
@@ -1600,6 +1600,9 @@ class H(BaseHTTPRequestHandler):
                     self.send_json(dict(ok=True))
             elif self.path == '/api/lineup':
                 self.send_json(lineup_write(int(body['tid']), body.get('sofa_id')) if body.get('write') else lineup_plan(int(body['tid']), body.get('sofa_id')))
+            elif self.path == '/api/restart':
+                self.send_json(dict(ok=True))
+                threading.Timer(0.5, restart).start()
             elif self.path == '/api/settings':
                 self.send_json(settings_set(body))
             elif self.path == '/api/ml/cancel':
@@ -1614,6 +1617,12 @@ class H(BaseHTTPRequestHandler):
                 self.send_json(dict(ok=False, error='not found'), 404)
         except Exception as ex:
             self.send_json(dict(ok=False, msg=str(ex)), 200)
+
+
+def restart():
+    """starts the converter again in the same process (same arguments, no new browser tab); the listening socket is not inherited, so the port is free for the new one"""
+    argv = sys.argv + ([] if '--no-browser' in sys.argv else ['--no-browser'])
+    os.execv(sys.executable, [sys.executable] + (argv if getattr(sys, 'frozen', False) is False else argv[1:]))
 
 
 def main():
