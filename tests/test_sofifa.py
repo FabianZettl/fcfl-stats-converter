@@ -66,4 +66,9 @@ full = {l: 60 for l in S._FM['labels'].values()}
 c = S.convert_fm(full, pos=12, ca=71)
 assert len(c) == 25 and all(40 <= v <= 99 for v in c.values()) and c['GKReach'] == 40 and c['Speed'] > 60, c
 assert S.missing_fm({}, False) and not S.missing_fm(full, True)
+
+# FMInside: the same page as copied text (label TAB value) and as innerText (label and value on two lines) gives the same values
+_fm = "Current ability\n51 / 100\nPotential\nDynamic\nFirst Touch (key)\t70\nCrossing (preferred)\t60\nAcceleration\t60\nAggression\t50\n"
+_fm2 = "Current ability\n51 / 100\nPotential\nDynamic\nFirst Touch (key)\n70\nCrossing (preferred)\n60\nAcceleration\n\n60\nAggression\n50\n"
+assert S.parse_fm(_fm) == S.parse_fm(_fm2) and S.parse_fm(_fm2)['Acceleration'] == 60 and S.parse_fm(_fm2)['Crossing'] == 60
 print('ok')

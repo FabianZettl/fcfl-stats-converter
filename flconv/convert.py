@@ -144,7 +144,8 @@ def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_cali
         raw = sofifa.parse_fm(fm_text)
         miss = sofifa.missing_fm(raw, gk)
         if miss:
-            return dict(ok=False, msg='The FM page lacks: %s' % ', '.join(miss[:6]))
+            i = fm_text.find('Crossing')
+            return dict(ok=False, msg='The FM page lacks: %s. Text around "Crossing" (for the bug report): %s' % (', '.join(miss[:6]), repr(fm_text[max(0, i - 10):i + 40]) if i >= 0 else 'not in the text'))
         stats = sofifa.convert_fm(raw, gk, pos, raw.get('overall'))
         smp = fm_samples(fm_calib) if fm_calib else []
         sh = fm_fit(smp) if not gk else {}

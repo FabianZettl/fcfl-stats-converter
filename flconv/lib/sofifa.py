@@ -155,10 +155,20 @@ def parse_fm(text):
         if m:
             out[key] = int(m.group(1))
     rng = {}
-    for ln in t.splitlines():
-        ln = ln.strip()
-        m = re.match(r'^(.+?)[\t ]+(\d{1,2})$', ln)
-        r = re.match(r'^(.+?)[\t ]+(\d{1,2})\s*[\u2013-]\s*(\d{1,2})$', ln)   # '5-25': FMInside shows a range for values the game generates when a save starts
+    t = re.sub(r'[\u200b-\u200f\u202a-\u202e\u2060\ufeff]', '', t)   # invisible marks that a web page puts around a number
+    ls = [x.strip() for x in t.splitlines() if x.strip()]
+    lines, i = [], 0
+    while i < len(ls):   # the label and its value on two lines (innerText of the page, instead of the copied text): put them together
+        nx = ls[i + 1] if i + 1 < len(ls) else ''
+        if re.fullmatch(r'\d{1,2}(\s*[\u2013-]\s*\d{1,2})?', nx) and not re.search(r'\s\d{1,2}$', ls[i]) and _norm(re.sub(r'\((?:key|preferred)\)', '', ls[i])) in FM_LABELS:
+            lines.append(ls[i] + '\t' + nx)
+            i += 2
+        else:
+            lines.append(ls[i])
+            i += 1
+    for ln in lines:
+        m = re.match(r'^(.+?)\s+(\d{1,2})$', ln)
+        r = re.match(r'^(.+?)\s+(\d{1,2})\s*[\u2013-]\s*(\d{1,2})$', ln)   # '5-25': FMInside shows a range for values the game generates when a save starts
         if r:
             k = FM_LABELS.get(_norm(re.sub(r'\((?:key|preferred)\)', '', r.group(1))))
             if k:
