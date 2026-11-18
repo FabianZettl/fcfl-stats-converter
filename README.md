@@ -125,3 +125,8 @@ changes, mostly by 1 per value and 0 or +-1 overall (7 clubs checked: 36 of abou
 
 Example: Michael Olise (Bayern), 13 matches, 1,065 minutes, rating 8.42 against a team rating of 7.34: Low Pass +2, Lofted Pass +2, Dribbling +2, Ball Control +2, Tight Possession +2, Defensive Awareness +1,
 Ball Winning +1, Finishing +1, Offensive Awareness +1, overall +1. It is applied as development on top of the time shift when the player is converted (the player panel shows every step).
+
+## Browser button for SoFIFA and FMInside (Tampermonkey)
+Instead of Ctrl+A, Ctrl+C and pasting: install `userscript/fcfl-send-player.user.js` in Tampermonkey (or Violentmonkey). On a player page of sofifa.com or fminside.net a red **-> FCFL** button appears.
+It sends the page to the running converter (`127.0.0.1:8790`, change `FCFL` at the top of the script if you use another port) and opens the converter, which finds the player in your database by name and
+shows the conversion of the page; one click writes it. If several players have the name, you pick the right one. Nothing leaves your computer except the request to your own converter.

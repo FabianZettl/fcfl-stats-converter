@@ -314,5 +314,10 @@ async function pickDb(start,kind){const d=$('#dl');d.classList.add('on');let cur
 let ST=null;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('#dr').classList.remove('on');$('#dl').classList.remove('on')}});
 (()=>{for(const [id,k] of [['sk','fc_sk'],['psb','fc_psb'],['pf','fc_pf'],['yb','fc_yb']]){const e=$('#'+id),v=localStorage.getItem(k);if(e&&v!==null){if(e.type==='checkbox')e.checked=v==='1';else e.value=v}if(e)e.addEventListener('change',()=>localStorage.setItem(k,e.type==='checkbox'?(e.checked?'1':'0'):e.value))}})();
-init();stLoad();
+async function takePaste(){try{const r=await api('/api/paste');if(!r.pending)return;const open=m=>{$('#dl').classList.remove('on');openPlayer(m.pid,{fm:r.text})};
+  const d=$('#dl');if(r.matches.length===1||(r.matches[0]&&r.matches[0].exact&&!(r.matches[1]&&r.matches[1].exact))){open(r.matches[0]);return}
+  d.classList.add('on');$('#dli').innerHTML='<h2 style="font-size:1.4rem;text-transform:none;color:var(--text)">Page from the browser: '+E((r.names||[])[0]||'')+'</h2><p class="mut">'+(r.matches.length?'Which player is it?':'No player of the database has this name: use the search on the left and paste the page there.')+'</p><div class="lst">'+r.matches.map((m,k)=>'<div class="prow" data-k="'+k+'" style="cursor:pointer"><span>'+E(m.name)+' · '+E(m.club)+' · '+E(m.pos)+' · '+(m.age||'?')+' y</span><b>'+m.ovr+'</b></div>').join('')+'</div><div class="foot" style="position:static"><button class="btn ghost" id="bC">Close</button></div>';
+  $('#bC').onclick=()=>d.classList.remove('on');document.querySelectorAll('#dli .prow').forEach(x=>x.onclick=e=>{e.stopPropagation();open(r.matches[+x.dataset.k])})}catch(e){}}
+init();stLoad();takePaste();document.addEventListener('visibilitychange',()=>{if(!document.hidden)takePaste()});
+
 </script></body></html>

@@ -369,6 +369,33 @@ def base_club(pid):
     return M.team.get(M.club_of.get(pid), '')
 
 
+PASTE = {}   # the last player page sent by the browser script (userscript/): names, text
+
+
+def paste_matches(names):
+    """players of the database that go with the names of a pasted page: [dict(pid, name, club, pos, age, ovr, exact)], exact matches first, then the best overall"""
+    folds = {fcdb.fold(n) for n in names if n and len(n) > 2}
+    out = {}
+    for pid, nm in M.name.items():
+        f = fcdb.fold(nm)
+        if f in folds:
+            out[pid] = True
+        elif pid not in out:
+            t = set(f.split())
+            for g in folds:
+                u = set(g.split())
+                if len(u) >= 2 and len(t) >= 2 and (u <= t or t <= u):
+                    out[pid] = False
+    rows = [dict(pid=p, name=M.name[p], club=club_name(p), pos=dbmeta.POS_NAMES[pos_of(p)] if pos_of(p) < 13 else '?', age=M.age.get(p), ovr=cur_ovr(p), exact=e) for p, e in out.items()]
+    return sorted(rows, key=lambda r: (not r['exact'], -r['ovr']))[:12]
+
+
+def paste_take():
+    p = dict(PASTE)
+    PASTE.clear()
+    return p
+
+
 def club_name(pid):
     ls = live_squads()
     return M.team.get((ls[1].get(pid) if ls and pid in ls[1] else M.club_of.get(pid)), '')
@@ -1681,6 +1708,9 @@ class H(BaseHTTPRequestHandler):
                 self.send_json(dict(ok=True, row=pl_row(int(q['pid'][0]), (q.get('youth') or ['1'])[0] != '0')))
             elif u.path == '/api/club':
                 self.send_json(club_view(int(q['tid'][0]), (q.get('youth') or ['1'])[0] != '0'))
+            elif u.path == '/api/paste':
+                p = paste_take() if PASTE else {}
+                self.send_json(dict(ok=True, pending=bool(p), text=p.get('text'), names=p.get('names'), matches=paste_matches(p['names']) if p else []))
             elif u.path == '/api/search':
                 self.send_json(dict(ok=True, items=[dict(id=x['id'], name=x['name'], club=x['club'], rating=x['rating'], pos=x['pos'], nation=x['nation']) for x in EA.search(q['q'][0], 14)]))
             elif u.path == '/api/candidates':
@@ -1732,6 +1762,13 @@ class H(BaseHTTPRequestHandler):
                     threading.Thread(target=bulk_job, args=(body.get('rest', 'scale'), body.get('youth', True), bool(body.get('dry', True)), body.get('profile', True), body.get('skills', 'off'), bool(body.get('psboost'))), daemon=True).start()
                     time.sleep(0.2)
                     self.send_json(dict(ok=True))
+            elif self.path == '/api/paste':
+                text = str(body.get('text') or '')
+                if len(text) < 200:
+                    self.send_json(dict(ok=False, msg='The page text is too short: is this a player page?'))
+                else:
+                    PASTE.update(text=text, names=[str(n) for n in (body.get('names') or [])][:4], url=str(body.get('url') or ''), t=time.time())
+                    self.send_json(dict(ok=True, matches=len(paste_matches(PASTE['names']))))
             elif self.path in ('/api/form', '/api/lineup'):
                 try:
                     t, sid = int(body['tid']), body.get('sofa_id')
