@@ -91,20 +91,21 @@ class Meta:
             try:
                 for row in json.load(open(plan_json)).get('leagues', []):
                     if isinstance(row.get('cid'), int):
-                        names[row['cid'] & 255] = row.get('name')
+                        names[row['cid']] = row.get('name')
             except Exception:
                 pass
         comp = {}
         for off in range(0, len(c), 36):
             code = c[off + 8:off + 36].split(b'\0')[0].decode('ascii', 'replace')
-            cid = struct.unpack_from('>H', c, off + 4)[0] & 255
+            cid = c[off + 5] | c[off + 7] << 8   # id byte + variant byte: Megapacks reuse one id for several leagues (ENGLAND_D1 and FL_365 are both 9)
             if code.endswith('_LEAGUE') and not _NOT_LEAGUE.search(code):
                 comp[cid] = names.get(cid) or league_title(code)
         mem = {}
         for off in range(0, len(e), 12):
             tid, _u, cid = struct.unpack_from('<III', e, off)
-            if (cid & 255) in comp:
-                mem.setdefault(cid & 255, set()).add(tid)
+            k = (cid & 255) | (cid >> 24) << 8
+            if k in comp:
+                mem.setdefault(k, set()).add(tid)
         self.leagues = {cid: dict(id=cid, name=comp[cid], teams=sorted(mem[cid], key=lambda t: self.team.get(t, ''))) for cid in comp if len(mem.get(cid, ())) >= 8}
         self.league_of = {t: cid for cid, L in self.leagues.items() for t in L['teams']}
 

@@ -4,7 +4,8 @@ import os
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MAP = json.load(open(os.path.join(HERE, '..', 'data', 'playstyle_map.json'), encoding='utf-8'))
+DATA = os.path.join(HERE, '..', 'data') if os.path.isdir(os.path.join(HERE, '..', 'data')) else os.path.join(HERE, 'data')   # PyInstaller puts lib/*.py next to data/
+MAP = json.load(open(os.path.join(DATA, 'playstyle_map.json'), encoding='utf-8'))
 
 
 def parse(text):
@@ -63,7 +64,7 @@ STYLE_MIN_AUC = 0.70   # a playing style is only given when the values tell it a
 def _model():
     if not _MODEL:
         try:
-            _MODEL.append(json.load(open(os.path.join(HERE, '..', 'data', 'skill_model.json'))))
+            _MODEL.append(json.load(open(os.path.join(DATA, 'skill_model.json'))))
         except OSError:
             _MODEL.append({})
     return _MODEL[0]
@@ -126,7 +127,7 @@ _M = {}
 def _load(name):
     if name not in _M:
         try:
-            _M[name] = json.load(open(os.path.join(HERE, '..', 'data', name)))
+            _M[name] = json.load(open(os.path.join(DATA, name)))
         except OSError:
             _M[name] = {}
     return _M[name]
