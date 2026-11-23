@@ -1,5 +1,4 @@
--- PESM-LivePatch: changes of the database (line-ups, shirt numbers, formations) reach the RUNNING game, no restart.
--- Attribute values: the code below writes them into the player table, but the game did not show them (v0.5.0), so the converter no longer sends them.
+-- PESM-LivePatch: changes of the database (Player.bin attributes, line-ups, shirt numbers, formations) reach the RUNNING game, no restart.
 -- The converter (FCFL) or PESM writes the files into content\pesm-livepatch\ (players.txt, teams.txt); you open the Sider overlay, pick this module and press F7.
 -- Everything is written into the game's memory with a check first (right table size, same players in the squad); a failed check writes nothing.
 local m = { version = "1.0" }
@@ -283,7 +282,7 @@ local function pending()
     local np = p and math.max(0, #p - 1) or 0
     local nt = 0
     for _, l in ipairs(t or {}) do if l:sub(1, 2) == "T " then nt = nt + 1 end end
-    pending_txt = string.format("Ready to load: %d teams", nt)
+    pending_txt = string.format("Ready to load: %d player values, %d teams", np, nt)
   end
   return pending_txt
 end
@@ -295,8 +294,8 @@ function m.overlay_on(ctx)
   s = s .. "\n 2. Here, in the main menu, press  F7."
   s = s .. "\n 3. Close the overlay (Space) and start your match as usual."
   s = s .. "\n    The changes are there at once.\n"
-  s = s .. "\n Live: line-ups, shirt numbers, formations."
-  s = s .. "\n Needs a restart: attribute values, skills, positions, names, new players.\n"
+  s = s .. "\n Live: line-ups, shirt numbers, formations, attributes."
+  s = s .. "\n Needs a restart: skills, positions, names, new players.\n"
   s = s .. "\n " .. pending()
   for _, l in ipairs(STATUS) do s = s .. "\n " .. l end
   return s

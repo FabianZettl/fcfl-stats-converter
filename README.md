@@ -54,15 +54,15 @@ Settings, backups and the copy of your original `Player.bin` are kept in `~/.loc
 
 ## Loading changes into the running game (PESM-LivePatch, no restart)
 
-When the converter writes a line-up, it also writes a small patch file into `<Sider>/content/pesm-livepatch/` and ships the Sider module
+When the converter writes `Player.bin` (attributes) or a line-up, it also writes small patch files into `<Sider>/content/pesm-livepatch/` and ships the Sider module
 **PESM-LivePatch** (`flconv/data/pesm-livepatch.lua`, copied to `<Sider>/modules/` at the first write). The database folder has to be below `<Sider>/livecpk/`.
 
 1. Once: at the first start of this version the converter asks (notice at the bottom right) whether to set it up: after your OK it copies the module and adds `lua.module = "pesm-livepatch.lua"` to `sider.ini` (a backup of `sider.ini` is made first). Restart the game once.
 2. Change and write in the converter (or in PESM, which uses the same files).
 3. In the game's main menu open the Sider overlay (Space), choose **PESM-LivePatch** (key `1`), press **F7**.
-4. Close the overlay and start your match as usual: the new line-up, shirt numbers and formations are there, no restart.
+4. Close the overlay and start your match as usual: the new line-up, shirt numbers and attribute values are there, no restart.
 
-What goes live: squad order (line-up), shirt numbers, formations. What needs a restart: attribute values (the module can write them into the game's player table, but the game did not show them, so they are not sent), skills, COM styles, positions, names, new or moved players.
+What goes live: the 25 attributes, squad order (line-up), shirt numbers, formations. What needs a restart: skills, COM styles, positions, names, new or moved players.
 How it works: the game keeps its tables as converted copies in memory (no copy of the files), the module finds them and writes only what differs, and only after a check
 (right table size, same players in the squad). The layout of the team objects was found with memory dumps (`tools/dev/`), see `flconv/livepatch.py`.
 

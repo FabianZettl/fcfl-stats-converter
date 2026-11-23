@@ -48,15 +48,15 @@ Die Umrechnung geht immer von den **Originalwerten** aus (beim ersten Benutzen e
 
 ## Änderungen ins laufende Spiel laden (PESM-LivePatch, ohne Neustart)
 
-Schreibt der Converter eine Aufstellung, legt er eine kleine Patch-Datei in `<Sider>/content/pesm-livepatch/` ab und bringt das Sider-Modul
+Schreibt der Converter `Player.bin` (Attribute) oder eine Aufstellung, legt er kleine Patch-Dateien in `<Sider>/content/pesm-livepatch/` ab und bringt das Sider-Modul
 **PESM-LivePatch** mit (`flconv/data/pesm-livepatch.lua`, wird beim ersten Schreiben nach `<Sider>/modules/` kopiert). Der Datenbankordner muss unter `<Sider>/livecpk/` liegen.
 
 1. Einmalig: beim ersten Start dieser Version fragt der Converter (Hinweis unten rechts), ob er es einrichten soll: nach deinem OK kopiert er das Modul und trägt `lua.module = "pesm-livepatch.lua"` in die `sider.ini` ein (vorher Backup der `sider.ini`). Das Spiel einmal neu starten.
 2. Im Converter ändern und schreiben (oder in PESM, das dieselben Dateien nutzt).
 3. Im Hauptmenü des Spiels das Sider-Overlay öffnen (Leertaste), **PESM-LivePatch** wählen (Taste `1`), **F7** drücken.
-4. Overlay schließen und das Match ganz normal starten: neue Aufstellung, Rückennummern und Formationen sind da, kein Neustart.
+4. Overlay schließen und das Match ganz normal starten: neue Aufstellung, Rückennummern und Attribute sind da, kein Neustart.
 
-Live geht: Kaderreihenfolge (Aufstellung), Rückennummern, Formationen. Neustart nötig: Attributwerte (das Modul schreibt sie in die Spielertabelle, das Spiel zeigte sie aber nicht an, deshalb werden sie nicht gesendet), Skills, COM-Styles, Positionen, Namen, neue oder gewechselte Spieler.
+Live geht: die 25 Attribute, Kaderreihenfolge (Aufstellung), Rückennummern, Formationen. Neustart nötig: Skills, COM-Styles, Positionen, Namen, neue oder gewechselte Spieler.
 
 ## Aufstellung und Performance (Sofascore)
 * **Line-up from Sofascore** (Vereinsansicht, Datenbank-Modus): liest das letzte Spiel des Vereins und schreibt Startelf, Bank und Trikotnummern in `PlayerAssignment.bin` (Backup, Prüfung nach dem Schreiben). Die Formation selbst wird nicht geschrieben. Das Spielfeld in der Vereinsansicht zeigt die Startelf.

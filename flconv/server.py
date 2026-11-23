@@ -1055,19 +1055,20 @@ def lp_install():
 
 
 def live_after(chg=None, team=None, restart=False):
-    """after a write into the database files: the patch file for the Sider module PESM-LivePatch (a changed line-up reaches the running game with F7) and one line that says what to do.
-    Attribute values are NOT sent live: they did not show in the game (the module wrote them into the player table, the game kept showing the old ones), so they need a restart.
+    """after a write into the database files: the patch files for the Sider module PESM-LivePatch (changes reach the running game with F7) and one line that says what to do.
     Never makes the write fail: '' when there is no Sider folder."""
     try:
         if lp_status()['state'] == 'none':
             return ''
-        restart = restart or bool(chg)
+        n = livepatch.add_players(CFG['pesdb'], chg, M.pb.n) if chg else None
         ok = livepatch.add_team(CFG['pesdb'], team) if team is not None else False
-        if not ok:
-            return 'Restart the game to see the new values (live loading works for line-ups, shirt numbers and formations only).' if restart else ''
+        if n is not None and n < 0:
+            return 'Too many values for a live patch (more than %d): restart the game.' % livepatch.MAX_LINES
+        if not (n or ok):
+            return ''
         if lp_status()['state'] != 'ok':
-            return 'Live loading of the line-up is not set up yet: use the notice at the bottom right of the converter ("Set up now"), then restart the game once.'
-        return 'Live: in the game open the Sider overlay (Space), choose PESM-LivePatch (key 1) and press F7 - no restart.' + (' Attribute values, skills, positions and names need a restart.' if restart else '')
+            return 'Live loading is not set up yet: use the notice at the bottom right of the converter ("Set up now"), then restart the game once.'
+        return 'Live: in the game open the Sider overlay (Space), choose PESM-LivePatch (key 1) and press F7 - no restart.' + (' Skills, positions and names need a restart.' if restart else '')
     except Exception:
         return ''
 
