@@ -385,6 +385,101 @@ local function dump_around(name, before, size)
   out(string.format("dump %s: start 0x%X, hit at 0x%X (offset %d), %d bytes, %d unreadable piece(s)", name, base, a, a - base, size, bad))
 end
 
+
+-- F12: write squad order, shirt numbers and formations of teams into the team objects of the game (teams.txt, tools/team_patch_make.py).
+-- Team object of rank r: base + r*1680; 40 x (pid u32, u32) at +0; 40 x u16 shirt numbers at +330; formation 1 / 2 (99 bytes) at +784 / +944.
+-- The base is found from the "LOC" team (not patched): its first formation block is searched, base = hit - 784 - rank*1680. A candidate base is only accepted if the squad
+-- of the first patched team in memory has the same players as the patch (only the order may change); otherwise nothing is written.
+local TOBJ, SQ, NUM, FM1, FM2 = 1680, 0, 330, 784, 944
+
+local function team_patch()
+  local t0 = os.clock()
+  local f = io.open(ctx_ref.sider_dir .. "content\\fcfl-livepatch\\teams.txt", "r")
+  if not f then out("teams: no teams.txt"); return end
+  local loc, T, N, FMS = nil, {}, {}, {}
+  for l in f:lines() do
+    local kind, rest = l:match("^(%a+) (.*)$")
+    if kind == "LOC" then
+      local r, hx = rest:match("^(%d+) (%x+)")
+      loc = { rank = tonumber(r), s = hx:gsub("%x%x", function(h) return string.char(tonumber(h, 16)) end) }
+    elseif kind == "T" or kind == "N" then
+      local r, tail = rest:match("^(%d+) ?(.*)$")
+      local v = {}
+      for x in tail:gmatch("%d+") do v[#v + 1] = tonumber(x) end
+      (kind == "T" and T or N)[tonumber(r)] = v
+    elseif kind == "F" then
+      local r, w, hx = rest:match("^(%d+) (%d) (%x+)")
+      FMS[#FMS + 1] = { rank = tonumber(r), which = tonumber(w), s = hx:gsub("%x%x", function(h) return string.char(tonumber(h, 16)) end) }
+    end
+  end
+  f:close()
+  if not loc then out("teams: no LOC line"); return end
+  local hits = {}
+  local CH, OV = 0x400000, 0x2000
+  for _, rg in ipairs(REGIONS(0x1000)) do
+    local off = 0
+    while off < rg[2] and #hits < 12 do
+      local s = RPM(rg[1] + off, math.min(CH + OV, rg[2] - off))
+      if s then
+        local init = 1
+        while #hits < 12 do
+          local h = s:find(loc.s, init, true)
+          if not h then break end
+          init = h + 1
+          if h - 1 < CH then hits[#hits + 1] = rg[1] + off + h - 1 end
+        end
+      end
+      off = off + CH
+    end
+  end
+  out(string.format("teams: %d candidate(s) for the base, scan %.2f s", #hits, os.clock() - t0))
+  local firstrank
+  for r in pairs(T) do if not firstrank or r < firstrank then firstrank = r end end
+  local base
+  for _, h in ipairs(hits) do
+    local b = h - FM1 - loc.rank * TOBJ
+    local mem = RPM(b + firstrank * TOBJ + SQ, 40 * 8)
+    if mem then
+      local want, have = {}, {}
+      for _, p in ipairs(T[firstrank]) do want[p] = true end
+      local ok, n = true, 0
+      for j = 0, 39 do
+        local p = u32(mem, j * 8)
+        if p ~= 0 then n = n + 1; if not want[p] then ok = false end end
+      end
+      if ok and n == #T[firstrank] then base = b; break end
+    end
+  end
+  if not base then out("teams: no candidate base fits the squad of the first team (nothing written)"); return end
+  out(string.format("teams: base 0x%X", base))
+  local wrote, skipped = 0, 0
+  for r, pids in pairs(T) do
+    local o = base + r * TOBJ
+    local mem = RPM(o + SQ, 40 * 8)
+    local want, ok = {}, mem ~= nil
+    for _, p in ipairs(pids) do want[p] = true end
+    if ok then
+      local n = 0
+      for j = 0, 39 do
+        local p = u32(mem, j * 8)
+        if p ~= 0 then n = n + 1; if not want[p] then ok = false end end
+      end
+      if n ~= #pids then ok = false end
+    end
+    if not ok then skipped = skipped + 1; out(string.format("team rank %d skipped: the squad in memory differs from the patch", r))
+    else
+      for j, p in ipairs(pids) do pcall(memory.write, o + SQ + (j - 1) * 8, memory.pack("u32", p)) end
+      if N[r] then for j, n in ipairs(N[r]) do pcall(memory.write, o + NUM + (j - 1) * 2, memory.pack("u16", n)) end end
+      wrote = wrote + 1
+    end
+  end
+  for _, fm in ipairs(FMS) do
+    local o = base + fm.rank * TOBJ + (fm.which == 1 and FM1 or FM2)
+    if T[fm.rank] and #fm.s == 99 then pcall(memory.write, o, fm.s) end
+  end
+  out(string.format("teams: %d team(s) written, %d skipped, %d formation block(s) in %.2f s", wrote, skipped, #FMS, os.clock() - t0))
+end
+
 function m.key_down(ctx, vkey)
   vkey = tonumber(vkey)
   if vkey == KEY_FIND then
@@ -393,6 +488,9 @@ function m.key_down(ctx, vkey)
     find_tables(lines[1][1])
   elseif vkey == 0x77 then   -- F8
     local ok, e = pcall(probe)
+    if not ok then out("ERROR " .. tostring(e)) end
+  elseif vkey == 0x7B then   -- F12
+    local ok, e = pcall(team_patch)
     if not ok then out("ERROR " .. tostring(e)) end
   elseif vkey == 0x7A then   -- F11
     local ok, e = pcall(function() dump_around("fm_codes", 0x80000, 0x400000); dump_around("squad_by_slot4", 0x80000, 0x400000) end)
@@ -411,7 +509,7 @@ end
 
 -- Sider only delivers key_down while the overlay (Space) is on and this module is the one shown (switch with the 1 key)
 function m.overlay_on(ctx)
-  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe tables  [F9] apply tables  [F10] needles  [F11] dump\n %s", last_msg)
+  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe tables  [F9] apply tables  [F10] needles  [F11] dump  [F12] team patch\n %s", last_msg)
 end
 
 function m.init(ctx)
