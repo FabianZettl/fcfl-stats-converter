@@ -46,6 +46,18 @@ Alles Weitere (Zuordnung der Spieler, Umrechnung, Jugendbonus, Entwicklung, Sich
 die Änderungen gegenüber dem PES Stats Converter in [CHANGES.md](CHANGES.md), die Datenquellen in [DATA.md](DATA.md).
 Die Umrechnung geht immer von den **Originalwerten** aus (beim ersten Benutzen einer Datenbank wird eine Kopie angelegt): zweimal ausführen gibt dasselbe Ergebnis.
 
+## Änderungen ins laufende Spiel laden (PESM-LivePatch, ohne Neustart)
+
+Schreibt der Converter `Player.bin` (Attribute) oder eine Aufstellung, legt er kleine Patch-Dateien in `<Sider>/content/pesm-livepatch/` ab und bringt das Sider-Modul
+**PESM-LivePatch** mit (`flconv/data/pesm-livepatch.lua`, wird beim ersten Schreiben nach `<Sider>/modules/` kopiert). Der Datenbankordner muss unter `<Sider>/livecpk/` liegen.
+
+1. Einmalig: `lua.module = "pesm-livepatch.lua"` in die `sider.ini` und das Spiel starten.
+2. Im Converter ändern und schreiben (oder in PESM, das dieselben Dateien nutzt).
+3. Im Hauptmenü des Spiels das Sider-Overlay öffnen (Leertaste), **PESM-LivePatch** wählen (Taste `1`), **F7** drücken.
+4. Overlay schließen und das Match ganz normal starten: neue Aufstellung, Rückennummern und Attribute sind da, kein Neustart.
+
+Live geht: die 25 Attribute, Kaderreihenfolge (Aufstellung), Rückennummern, Formationen. Neustart nötig: Skills, COM-Styles, Positionen, Namen, neue oder gewechselte Spieler.
+
 ## Aufstellung und Performance (Sofascore)
 * **Line-up from Sofascore** (Vereinsansicht, Datenbank-Modus): liest das letzte Spiel des Vereins und schreibt Startelf, Bank und Trikotnummern in `PlayerAssignment.bin` (Backup, Prüfung nach dem Schreiben). Die Formation selbst wird nicht geschrieben. Das Spielfeld in der Vereinsansicht zeigt die Startelf.
 * **Performance since 01.09.**: Note und Sofascore-Werte (Passen, Dribbling, Defensive, Schuss, Torwart) seit dem Stand der Daten, gewichtet nach Minuten (mindestens 3 Spiele und 270 Minuten, volles Gewicht ab 900), verglichen mit dem Team-Schnitt: wer besser ist als sein Team, bekommt auf den passenden Einzelwerten bis zu +3, wer schlechter ist, bis zu -3. Das Overall bewegt sich höchstens um 2, in der Praxis um 0 oder 1. Auch die Entwicklung über die Zeit wird gewichtet: bestätigt der Spieler seine Werte, bleibt sie wie sie ist; übertrifft er sie, wächst ein junger Spieler stärker bzw. baut ein älterer weniger ab (bis zu x1,5 bzw. x0,5), untertrifft er sie, umgekehrt. Die Rechnung steht in der englischen README. Option *Live data (performance)* unter *Conversion options*; *Convert the club* wendet sie zusammen mit den anderen Optionen an.

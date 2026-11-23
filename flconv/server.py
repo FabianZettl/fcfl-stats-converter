@@ -25,6 +25,7 @@ import playstyle  # noqa: E402
 import collections  # noqa: E402
 import timeshift  # noqa: E402
 import dbmeta  # noqa: E402
+import livepatch  # noqa: E402
 import fcdb  # noqa: E402
 import fmcal  # noqa: E402
 import plbin  # noqa: E402
@@ -989,7 +990,7 @@ def commit(writes, srcs, names=None, profs=None):
         return ml_write(writes, srcs, profs)
     r = write_all(writes, srcs, names or {}, profs or {})
     if r.get('ok'):
-        r['edit'] = drop_edit()
+        r['edit'] = ' '.join(x for x in (drop_edit(), r.get('live')) if x)
     return r
 
 
@@ -999,6 +1000,32 @@ def _keep(path, name):
     dst = os.path.join(DATA, 'moved', '%s.%s' % (name, time.strftime('%Y%m%d-%H%M%S')))
     shutil.copy2(path, dst)
     return dst
+
+
+def live_after(chg=None, team=None, restart=False):
+    """after a write into the database files: the patch files for the Sider module PESM-LivePatch (changes reach the running game with F7) and one line that says what to do.
+    Never makes the write fail: '' when there is no Sider folder."""
+    try:
+        sd = livepatch.sider_dir(CFG['pesdb'])
+        if not sd or not os.path.isdir(os.path.join(sd, 'modules')):
+            return ''
+        n = livepatch.add_players(CFG['pesdb'], chg, M.pb.n) if chg else None
+        ok = livepatch.add_team(CFG['pesdb'], team) if team is not None else False
+        dst, src = os.path.join(sd, 'modules', 'pesm-livepatch.lua'), os.path.join(HERE, 'data', 'pesm-livepatch.lua')
+        if not os.path.isfile(dst) or open(dst, 'rb').read() != open(src, 'rb').read():
+            shutil.copy2(src, dst)
+        if n is not None and n < 0:
+            return 'Too many values for a live patch (more than %d): restart the game.' % livepatch.MAX_LINES
+        if not (n or ok):
+            return ''
+        ini = os.path.join(sd, 'sider.ini')
+        on = os.path.isfile(ini) and 'pesm-livepatch.lua' in open(ini, errors='replace').read()
+        msg = 'Live: in the game open the Sider overlay (Space), choose PESM-LivePatch (key 1) and press F7 - no restart.'
+        if not on:
+            msg = 'Live loading needs a one-time step: add  lua.module = "pesm-livepatch.lua"  to sider.ini and restart the game once. Then: ' + msg[6:]
+        return msg + (' Skills, positions and names need a restart.' if restart else '')
+    except Exception:
+        return ''
 
 
 def drop_edit():
@@ -1120,7 +1147,7 @@ def lineup_write(tid, sofa_id=None):
             fo = {}
         fo[str(tid)] = pl['formation']
         json.dump(fo, open(fp, 'w'))
-    return dict(ok=True, written=len(want), backup=bk, edit=drop_edit())
+    return dict(ok=True, written=len(want), backup=bk, edit=' '.join(x for x in (drop_edit(), live_after(team=tid)) if x))
 
 
 FORM = {}   # pid -> performance since the date of the data (Sofascore), see form_read
@@ -1323,6 +1350,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
 def write_all(writes, srcs, names, profs=None):
     profs = profs or {}
     """Player.bin: backup, write, read again and check, journal"""
+    chg = {}   # pid -> {attribute: new value} of what really changed (for the live patch)
     with LOCK:
         pb = M.pb
         before = bytes(pb.data)
@@ -1331,7 +1359,10 @@ def write_all(writes, srcs, names, profs=None):
             for pid, att in writes.items():
                 i = pb.index[pid]
                 for a, v in att.items():
+                    old = pb.get(i, a)
                     pb.set(i, a, v)
+                    if pb.get(i, a) != old:
+                        chg.setdefault(pid, {})[a] = pb.get(i, a)
             for pid, nm in names.items():
                 for k, v in nm.items():
                     pb.set_name(pb.index[pid], k, v)
@@ -1353,7 +1384,7 @@ def write_all(writes, srcs, names, profs=None):
         for pid in writes:
             jn[str(pid)] = jentry(pid, srcs.get(pid), pb.attrs(pb.index[pid]))
         json.dump(jn, open(CFG['journal'], 'w'))
-        return dict(ok=True, written=len(writes), names=len(names), profile=len(profs), backup=bk)
+        return dict(ok=True, written=len(writes), names=len(names), profile=len(profs), backup=bk, live=live_after(chg=chg, restart=bool(names or profs)))
 
 
 ML_TAGS = {}

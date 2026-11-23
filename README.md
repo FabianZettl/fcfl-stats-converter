@@ -52,6 +52,20 @@ The tool opens `http://127.0.0.1:8790/` in your browser (it only listens on your
 Settings, backups and the copy of your original `Player.bin` are kept in `~/.local/share/fl-stats-converter` (Linux) or
 `%APPDATA%\FL-Stats-Converter` (Windows); `--data-dir` changes that.
 
+## Loading changes into the running game (PESM-LivePatch, no restart)
+
+When the converter writes `Player.bin` (attributes) or a line-up, it also writes small patch files into `<Sider>/content/pesm-livepatch/` and ships the Sider module
+**PESM-LivePatch** (`flconv/data/pesm-livepatch.lua`, copied to `<Sider>/modules/` at the first write). The database folder has to be below `<Sider>/livecpk/`.
+
+1. Once: add `lua.module = "pesm-livepatch.lua"` to `sider.ini` and start the game.
+2. Change and write in the converter (or in PESM, which uses the same files).
+3. In the game's main menu open the Sider overlay (Space), choose **PESM-LivePatch** (key `1`), press **F7**.
+4. Close the overlay and start your match as usual: the new line-up, shirt numbers and attribute values are there, no restart.
+
+What goes live: the 25 attributes, squad order (line-up), shirt numbers, formations. What needs a restart: skills, COM styles, positions, names, new or moved players.
+How it works: the game keeps its tables as converted copies in memory (no copy of the files), the module finds them and writes only what differs, and only after a check
+(right table size, same players in the squad). The layout of the team objects was found with memory dumps (`tools/dev/`), see `flconv/livepatch.py`.
+
 ## Writing into a running Master League (needs Gaffer)
 
 By default the tool writes `Player.bin` (for new careers). To change a career that is already running you need **Gaffer** (a separate tool; its bridge is the way into the running game):

@@ -5,7 +5,7 @@ import struct
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'flconv'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'flconv'))
 import dbmeta
 
 db, tid, outp = sys.argv[1], int(sys.argv[2]), sys.argv[3]
