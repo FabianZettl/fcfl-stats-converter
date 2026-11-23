@@ -1002,28 +1002,73 @@ def _keep(path, name):
     return dst
 
 
+def lp_status():
+    """the Sider module PESM-LivePatch: state 'none' (no Sider folder to offer it for), 'ok' (module and sider.ini line are there) or 'ask' (the user has to confirm the set-up).
+    A module that is there but older than the one we ship is replaced at once (the old one is kept): the user has set it up already."""
+    sd = livepatch.sider_dir(CFG['pesdb'])
+    md = os.path.join(sd, 'modules') if sd else ''
+    if not sd or not os.path.isdir(md):
+        return dict(state='none')
+    dst, ini, src = os.path.join(md, 'pesm-livepatch.lua'), os.path.join(sd, 'sider.ini'), os.path.join(HERE, 'data', 'pesm-livepatch.lua')
+    on = os.path.isfile(ini) and any(l.strip().startswith('lua.module') and 'pesm-livepatch.lua' in l for l in open(ini, errors='replace'))
+    same = os.path.isfile(dst) and open(dst, 'rb').read() == open(src, 'rb').read()
+    if on and os.path.isfile(dst) and not same:
+        try:
+            _keep(dst, 'pesm-livepatch.lua')
+            shutil.copy2(src, dst)
+            same = True
+        except OSError:
+            pass
+    return dict(state='ok' if on and same else 'ask', modules=md, ini=ini, have_ini=os.path.isfile(ini), hidden=bool(SET.get('lp_hide')))
+
+
+def lp_install():
+    """after the user has confirmed: copy the module into the Sider modules folder and add  lua.module = "pesm-livepatch.lua"  to sider.ini (backup of sider.ini first, line endings kept)"""
+    st = lp_status()
+    if st['state'] == 'none' or not st.get('have_ini'):
+        return dict(ok=False, msg='No Sider folder with a sider.ini found next to the database folder: copy data/pesm-livepatch.lua to the Sider modules folder and add the line to sider.ini yourself.')
+    dst, ini = os.path.join(st['modules'], 'pesm-livepatch.lua'), st['ini']
+    bak = '%s.bak-fcfl-%s' % (ini, time.strftime('%Y%m%d_%H%M%S'))
+    try:
+        if os.path.isfile(dst):
+            _keep(dst, 'pesm-livepatch.lua')
+        shutil.copy2(os.path.join(HERE, 'data', 'pesm-livepatch.lua'), dst)
+        shutil.copy2(ini, bak)
+        text = open(ini, 'r', errors='surrogateescape', newline='').read()
+        if not any(l.strip().startswith('lua.module') and 'pesm-livepatch.lua' in l for l in text.splitlines()):
+            lines = text.splitlines(True)
+            idx = [i for i, l in enumerate(lines) if l.strip().startswith('lua.module')]
+            at = idx[-1] if idx else len(lines) - 1
+            ind = lines[at][:len(lines[at]) - len(lines[at].lstrip())] if idx else ''
+            eol = '\r\n' if lines and lines[at].endswith('\r\n') else '\n'
+            if lines and not lines[at].endswith(('\n', '\r')):
+                lines[at] += eol
+            lines.insert(at + 1, '%slua.module = "pesm-livepatch.lua"%s' % (ind, eol))
+            tmp = ini + '.tmp'
+            open(tmp, 'w', errors='surrogateescape', newline='').write(''.join(lines))
+            os.replace(tmp, ini)
+    except OSError as ex:
+        return dict(ok=False, msg='Set-up failed: %s' % ex)
+    if lp_status()['state'] != 'ok':
+        return dict(ok=False, msg='The line is not in sider.ini after writing; backup: %s' % bak)
+    return dict(ok=True, backup=bak, module=dst)
+
+
 def live_after(chg=None, team=None, restart=False):
     """after a write into the database files: the patch files for the Sider module PESM-LivePatch (changes reach the running game with F7) and one line that says what to do.
     Never makes the write fail: '' when there is no Sider folder."""
     try:
-        sd = livepatch.sider_dir(CFG['pesdb'])
-        if not sd or not os.path.isdir(os.path.join(sd, 'modules')):
+        if lp_status()['state'] == 'none':
             return ''
         n = livepatch.add_players(CFG['pesdb'], chg, M.pb.n) if chg else None
         ok = livepatch.add_team(CFG['pesdb'], team) if team is not None else False
-        dst, src = os.path.join(sd, 'modules', 'pesm-livepatch.lua'), os.path.join(HERE, 'data', 'pesm-livepatch.lua')
-        if not os.path.isfile(dst) or open(dst, 'rb').read() != open(src, 'rb').read():
-            shutil.copy2(src, dst)
         if n is not None and n < 0:
             return 'Too many values for a live patch (more than %d): restart the game.' % livepatch.MAX_LINES
         if not (n or ok):
             return ''
-        ini = os.path.join(sd, 'sider.ini')
-        on = os.path.isfile(ini) and 'pesm-livepatch.lua' in open(ini, errors='replace').read()
-        msg = 'Live: in the game open the Sider overlay (Space), choose PESM-LivePatch (key 1) and press F7 - no restart.'
-        if not on:
-            msg = 'Live loading needs a one-time step: add  lua.module = "pesm-livepatch.lua"  to sider.ini and restart the game once. Then: ' + msg[6:]
-        return msg + (' Skills, positions and names need a restart.' if restart else '')
+        if lp_status()['state'] != 'ok':
+            return 'Live loading is not set up yet: use the notice at the bottom right of the converter ("Set up now"), then restart the game once.'
+        return 'Live: in the game open the Sider overlay (Space), choose PESM-LivePatch (key 1) and press F7 - no restart.' + (' Skills, positions and names need a restart.' if restart else '')
     except Exception:
         return ''
 
@@ -1748,6 +1793,8 @@ class H(BaseHTTPRequestHandler):
                 self.send_json(dict(ok=True, items=candidates(int(q['pid'][0]), (q.get('q') or [None])[0])))
             elif u.path == '/api/fmcal':
                 self.send_json(fmcal.view(CFG['fmcal']))
+            elif u.path == '/api/livepatch':
+                self.send_json(dict(ok=True, **lp_status()))
             elif u.path == '/api/settings':
                 self.send_json(settings_view())
             elif u.path == '/api/ml/job':
@@ -1815,6 +1862,13 @@ class H(BaseHTTPRequestHandler):
             elif self.path == '/api/restart':
                 self.send_json(dict(ok=True))
                 threading.Timer(0.5, restart).start()
+            elif self.path == '/api/livepatch':
+                if body.get('action') == 'install':
+                    self.send_json(lp_install())
+                else:
+                    SET['lp_hide'] = True
+                    json.dump(SET, open(SET_FILE, 'w'))
+                    self.send_json(dict(ok=True))
             elif self.path == '/api/settings':
                 self.send_json(settings_set(body))
             elif self.path == '/api/ml/cancel':

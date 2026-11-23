@@ -57,7 +57,7 @@ Settings, backups and the copy of your original `Player.bin` are kept in `~/.loc
 When the converter writes `Player.bin` (attributes) or a line-up, it also writes small patch files into `<Sider>/content/pesm-livepatch/` and ships the Sider module
 **PESM-LivePatch** (`flconv/data/pesm-livepatch.lua`, copied to `<Sider>/modules/` at the first write). The database folder has to be below `<Sider>/livecpk/`.
 
-1. Once: add `lua.module = "pesm-livepatch.lua"` to `sider.ini` and start the game.
+1. Once: at the first start of this version the converter asks (notice at the bottom right) whether to set it up: after your OK it copies the module and adds `lua.module = "pesm-livepatch.lua"` to `sider.ini` (a backup of `sider.ini` is made first). Restart the game once.
 2. Change and write in the converter (or in PESM, which uses the same files).
 3. In the game's main menu open the Sider overlay (Space), choose **PESM-LivePatch** (key `1`), press **F7**.
 4. Close the overlay and start your match as usual: the new line-up, shirt numbers and attribute values are there, no restart.

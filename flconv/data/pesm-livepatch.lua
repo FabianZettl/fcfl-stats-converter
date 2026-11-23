@@ -174,7 +174,7 @@ local function load_players()
     tabs = find_player_tables(rows[1][1], count)
     pt_cache.tables = tabs
   end
-  if #tabs == 0 then say("Spielertabelle nicht gefunden (Spielerzahl " .. count .. ")"); return 0, #rows end
+  if #tabs == 0 then say("player table not found (" .. count .. " players)"); return 0, #rows end
   local written, bad = 0, 0
   for _, t in ipairs(tabs) do
     if not t.index then build_index(t) end
@@ -238,7 +238,7 @@ local function load_teams()
     end
     tb_cache.base = base
   end
-  if not base then say("Teamtabelle nicht gefunden (Kader von Team " .. first .. " passt nicht)"); return 0, 1 end
+  if not base then say("team table not found (squad of team " .. first .. " does not match)"); return 0, 1 end
   local wrote, skipped = 0, 0
   for r, pids in pairs(T) do
     local o = base + r * TOBJ
@@ -260,14 +260,14 @@ end
 ---------------------------------------------------------------- keys and overlay
 local function load_all()
   local t0 = os.clock()
-  if not RPM then say("kein ffi: nichts geladen"); return end
+  if not RPM then say("no ffi: nothing loaded"); return end
   local w, b = 0, 0
   local ok, e = pcall(function() local a, c = load_players(); w, b = a, c end)
-  if not ok then say("Fehler bei Spielerwerten: " .. tostring(e)) end
+  if not ok then say("error in player values: " .. tostring(e)) end
   local tw, ts = 0, 0
   ok, e = pcall(function() local a, c = load_teams(); tw, ts = a, c end)
-  if not ok then say("Fehler bei Teams: " .. tostring(e)) end
-  say(string.format("geladen: %d Spielerwerte, %d Teams (%d uebersprungen) in %.1f s", w, tw, b + ts, os.clock() - t0))
+  if not ok then say("error in teams: " .. tostring(e)) end
+  say(string.format("loaded: %d player values, %d teams (%d skipped) in %.1f s", w, tw, b + ts, os.clock() - t0))
 end
 
 function m.key_down(ctx, vkey)
@@ -282,20 +282,20 @@ local function pending()
     local np = p and math.max(0, #p - 1) or 0
     local nt = 0
     for _, l in ipairs(t or {}) do if l:sub(1, 2) == "T " then nt = nt + 1 end end
-    pending_txt = string.format("Bereit zum Laden: %d Spielerwerte, %d Teams", np, nt)
+    pending_txt = string.format("Ready to load: %d player values, %d teams", np, nt)
   end
   return pending_txt
 end
 
 function m.overlay_on(ctx)
   local s = LOGO
-  s = s .. "\n Aenderungen live ins Spiel laden - ohne Neustart\n"
-  s = s .. "\n 1. Im Manager (PESM) oder im FCFL-Converter aendern und schreiben."
-  s = s .. "\n 2. Hier im Hauptmenue  F7  druecken."
-  s = s .. "\n 3. Overlay schliessen (Leertaste), Match ganz normal starten."
-  s = s .. "\n    Die Aenderungen sind sofort sichtbar.\n"
-  s = s .. "\n Aufstellung, Rueckennummern, Formation, Attribute: live."
-  s = s .. "\n Skills, Positionen, Namen, neue Spieler: nur nach Neustart.\n"
+  s = s .. "\n Load changes into the running game - no restart\n"
+  s = s .. "\n 1. Change and write in the manager (PESM) or in the FCFL converter."
+  s = s .. "\n 2. Here, in the main menu, press  F7."
+  s = s .. "\n 3. Close the overlay (Space) and start your match as usual."
+  s = s .. "\n    The changes are there at once.\n"
+  s = s .. "\n Live: line-ups, shirt numbers, formations, attributes."
+  s = s .. "\n Needs a restart: skills, positions, names, new players.\n"
   s = s .. "\n " .. pending()
   for _, l in ipairs(STATUS) do s = s .. "\n " .. l end
   return s

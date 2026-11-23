@@ -116,7 +116,17 @@ $('#gsr').addEventListener('click',async e=>{const i=e.target.closest('.gsi');if
   else if(i.dataset.p)openPlayer(+i.dataset.p)});
 document.addEventListener('click',e=>{if(!e.target.closest('#gs,#gsr'))$('#gsr').style.display='none'});
 async function init(){const r=await api('/api/init');LG=r.leagues;$('#info').innerHTML=r.players.toLocaleString()+' players in the database<br>'+r.ea.toLocaleString()+' players in '+E(r.csv);
-  $('#lg').innerHTML='<option value="">Choose a league …</option>'+LG.map(l=>'<option value="'+l.id+'">'+E(l.name)+' ('+l.n+')</option>').join('');}
+  $('#lg').innerHTML='<option value="">Choose a league …</option>'+LG.map(l=>'<option value="'+l.id+'">'+E(l.name)+' ('+l.n+')</option>').join('');  lpCheck()}
+async function lpCheck(){const r=await api('/api/livepatch');if(!r.ok||r.state!=='ask'||r.hidden||$('#lpB'))return;
+  document.body.insertAdjacentHTML('beforeend','<div id="lpB" class="msg ok" style="position:fixed;right:18px;bottom:18px;max-width:440px;z-index:60;background:var(--surface);box-shadow:0 6px 24px #0008"><b>New: load changes into the running game</b>'
+   +'<p class="mut" style="margin:6px 0;font-size:.82rem">PESM-LivePatch is a small Sider module. With it, line-ups and values you write here reach the running game with <b>F7</b> in the Sider overlay, no restart.'
+   +' Setting it up copies the module into <code>'+E(r.modules)+'</code> and adds one line to <code>'+E(r.ini)+'</code>. A backup of sider.ini is made first.</p>'
+   +'<button class="btn sm" id="lpY"'+(r.have_ini?'':' disabled')+'>Set up now</button> <button class="btn ghost sm" id="lpN">Not now</button><div id="lpM"></div></div>');
+  $('#lpN').onclick=async()=>{await api('/api/livepatch',{action:'hide'});$('#lpB').remove()};
+  $('#lpY').onclick=async()=>{$('#lpY').disabled=true;const w=await api('/api/livepatch',{action:'install'});
+    $('#lpM').innerHTML=w.ok?'<p style="margin:8px 0 0;font-size:.82rem">Done. Backup: '+E((w.backup||'').split('/').pop())+'<br>Restart the game once. Then: Space (overlay), key 1 to PESM-LivePatch, F7.</p>':'<p style="margin:8px 0 0;font-size:.82rem;color:#e58">'+E(w.msg||'failed')+'</p>';
+    if(w.ok){$('#lpN').textContent='Close';$('#lpN').onclick=()=>$('#lpB').remove()}}}
+
 $('#lg').onchange=async e=>{if(!e.target.value)return;$('#clubs').innerHTML='<p class="mut">Searching the database …</p>';CUR=await api('/api/league?id='+e.target.value);
   $('#clubs').innerHTML=CUR.clubs.map(c=>'<div class="cl" data-t="'+c.tid+'">'+crest(c.name)+'<span>'+E(c.name)+'</span><small>'+c.found+'/'+c.n+'</small></div>').join('')+'<button class="btn ghost sm" id="allB" style="margin-top:8px">Convert the whole league …</button><button class="btn ghost sm" id="misB" style="margin-top:6px">Not found in this league …</button>';
   $('#misB').onclick=()=>missing(+e.target.value,CUR.name);
