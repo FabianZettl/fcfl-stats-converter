@@ -300,6 +300,71 @@ local function apply_tables()
   out(string.format("tables done in %.2f s", os.clock() - t0))
 end
 
+
+-- F10: search the byte strings of content\\fcfl-livepatch\\needles.txt ("name hexbytes" per line, made by tools/make_needles.py) in the whole process and log the bytes around every hit,
+-- to find out how the game keeps a table that is NOT an image of its file. Reads only. Hits with the same surroundings (copies) are listed once with their addresses.
+local function hex(str) return (str:gsub(".", function(c) return string.format("%02x", c:byte()) end)) end
+
+local function needles_search()
+  local t0 = os.clock()
+  local f = io.open(ctx_ref.sider_dir .. "content\\fcfl-livepatch\\needles.txt", "r")
+  if not f then out("needles: no needles.txt"); return end
+  local list = {}
+  for l in f:lines() do
+    local name, hx = l:match("^(%S+) (%x+)")
+    if name then
+      local b = hx:gsub("%x%x", function(h) return string.char(tonumber(h, 16)) end)
+      list[#list + 1] = { name = name, s = b, hits = {}, own = nil }
+      local okp, pa = pcall(function() return tonumber(FFI.cast("uintptr_t", FFI.cast("const char*", b))) end)
+      if okp then list[#list].own = pa end
+    end
+  end
+  f:close()
+  collectgarbage()
+  local CH, OV, BEF, AFT = 0x400000, 0x2000, 64, 160
+  local regs = REGIONS(0x1000)
+  for _, rg in ipairs(regs) do
+    local off = 0
+    while off < rg[2] do
+      local s = RPM(rg[1] + off, math.min(CH + OV, rg[2] - off))
+      if s then
+        for _, nd in ipairs(list) do
+          local init = 1
+          while #nd.hits < 30 do
+            local h = s:find(nd.s, init, true)
+            if not h then break end
+            init = h + 1
+            if h - 1 < CH then
+              local a = rg[1] + off + h - 1
+              if a ~= nd.own then nd.hits[#nd.hits + 1] = a end
+            end
+          end
+        end
+      end
+      off = off + CH
+    end
+  end
+  for _, nd in ipairs(list) do
+    out(string.format("needle %s (%d bytes): %d hit(s)", nd.name, #nd.s, #nd.hits))
+    local groups, order = {}, {}
+    for _, a in ipairs(nd.hits) do
+      local ctx_bytes = RPM(a - BEF, BEF + AFT) or RPM(a, #nd.s) or ""
+      local key = hex(ctx_bytes)
+      if not groups[key] then groups[key] = { addrs = {} }; order[#order + 1] = key end
+      groups[key].addrs[#groups[key].addrs + 1] = a
+    end
+    for gi, key in ipairs(order) do
+      if gi > 6 then break end
+      local g = groups[key]
+      local al = {}
+      for i = 1, math.min(#g.addrs, 4) do al[#al + 1] = string.format("0x%X", g.addrs[i]) end
+      out(string.format("  context %d: %d copy(ies) @ %s  (hit is at byte %d)", gi, #g.addrs, table.concat(al, " "), BEF))
+      for i = 1, #key, 64 do out("    " .. key:sub(i, i + 63)) end
+    end
+  end
+  out(string.format("needles done in %.2f s", os.clock() - t0))
+end
+
 function m.key_down(ctx, vkey)
   vkey = tonumber(vkey)
   if vkey == KEY_FIND then
@@ -308,6 +373,9 @@ function m.key_down(ctx, vkey)
     find_tables(lines[1][1])
   elseif vkey == 0x77 then   -- F8
     local ok, e = pcall(probe)
+    if not ok then out("ERROR " .. tostring(e)) end
+  elseif vkey == 0x79 then   -- F10
+    local ok, e = pcall(needles_search)
     if not ok then out("ERROR " .. tostring(e)) end
   elseif vkey == 0x78 then   -- F9
     local ok, e = pcall(apply_tables)
@@ -320,7 +388,7 @@ end
 
 -- Sider only delivers key_down while the overlay (Space) is on and this module is the one shown (switch with the 1 key)
 function m.overlay_on(ctx)
-  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe tables  [F9] apply tables\n %s", last_msg)
+  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe tables  [F9] apply tables  [F10] needles\n %s", last_msg)
 end
 
 function m.init(ctx)
