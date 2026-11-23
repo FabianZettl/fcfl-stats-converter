@@ -188,12 +188,82 @@ local function apply()
   out(string.format("apply done in %.2f s", os.clock() - t0))
 end
 
+
+-- F8: do the other database tables sit in memory as an unchanged image of their file? Needs raw\<name>.raw (tools/export_raw.py). Only reads.
+local PROBES = { { "PlayerAssignment", 16 }, { "Tactics", 12 }, { "TacticsFormation", 12 }, { "Team", 1532 }, { "Competition", 36 }, { "CompetitionEntry", 12 } }
+
+local function probe()
+  local t0 = os.clock()
+  local dir = ctx_ref.sider_dir .. "content\\fcfl-livepatch\\raw\\"
+  local items, needles = {}, {}
+  for _, P in ipairs(PROBES) do
+    local f = io.open(dir .. P[1] .. ".raw", "rb")
+    if f then
+      local raw = f:read("*a"); f:close()
+      local rs, n = P[2], math.floor(#raw / P[2])
+      local it = { name = P[1], rs = rs, n = n, raw = raw, hits = {} }
+      items[#items + 1] = it
+      for _, fr in ipairs({ 0.3, 0.5, 0.7 }) do
+        local k = math.floor(n * fr)
+        needles[#needles + 1] = { it = it, k = k, s = raw:sub(k * rs + 1, (k + 4) * rs) }
+      end
+    else
+      out("probe: no raw file for " .. P[1])
+    end
+  end
+  if #items == 0 then out("probe: nothing exported, run tools/export_raw.py"); return end
+  local CH, OV = 0x400000, 0x2000
+  local regs = REGIONS(0x1000)
+  for _, rg in ipairs(regs) do
+    local off = 0
+    while off < rg[2] do
+      local s = RPM(rg[1] + off, math.min(CH + OV, rg[2] - off))
+      if s then
+        for _, nd in ipairs(needles) do
+          local init = 1
+          while true do
+            local h = s:find(nd.s, init, true)
+            if not h then break end
+            init = h + 1
+            if h - 1 < CH and #nd.it.hits < 12 then nd.it.hits[#nd.it.hits + 1] = rg[1] + off + h - 1 - nd.k * nd.it.rs end
+          end
+        end
+      end
+      off = off + CH
+    end
+  end
+  out(string.format("probe: scanned %d regions in %.2f s", #regs, os.clock() - t0))
+  for _, it in ipairs(items) do
+    local seen, any = {}, false
+    for _, base in ipairs(it.hits) do
+      if not seen[base] and base > 0x10000 then
+        seen[base] = true
+        local mem = RPM(base, it.n * it.rs)
+        local same = 0
+        if mem then
+          for r = 0, it.n - 1 do
+            local o = r * it.rs
+            if mem:sub(o + 1, o + it.rs) == it.raw:sub(o + 1, o + it.rs) then same = same + 1 end
+          end
+        end
+        any = true
+        out(string.format("probe %s: image @0x%X, %d of %d rows identical to the file", it.name, base, same, it.n))
+      end
+    end
+    if not any then out("probe " .. it.name .. ": no image of the file in memory (the game converts it)") end
+  end
+  out(string.format("probe done in %.2f s", os.clock() - t0))
+end
+
 function m.key_down(ctx, vkey)
   vkey = tonumber(vkey)
   if vkey == KEY_FIND then
     local lines = read_patch()
     if not lines or #lines == 0 then out("need a patch file (its first player id is searched)"); return end
     find_tables(lines[1][1])
+  elseif vkey == 0x77 then   -- F8
+    local ok, e = pcall(probe)
+    if not ok then out("ERROR " .. tostring(e)) end
   elseif vkey == KEY_APPLY then
     local ok, e = pcall(apply)
     if not ok then out("ERROR " .. tostring(e)) end
@@ -202,7 +272,7 @@ end
 
 -- Sider only delivers key_down while the overlay (Space) is on and this module is the one shown (switch with the 1 key)
 function m.overlay_on(ctx)
-  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch\n %s", last_msg)
+  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe other tables\n %s", last_msg)
 end
 
 function m.init(ctx)
