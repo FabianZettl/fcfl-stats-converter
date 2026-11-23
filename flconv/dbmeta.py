@@ -72,6 +72,7 @@ class Meta:
         self._teams()
         self._leagues(plan_json)
         self._assign()
+        self._tactics()
 
     def _teams(self):
         tm = _unz(os.path.join(self.pesdb, 'Team.bin'))
@@ -120,6 +121,30 @@ class Meta:
             self.squad.setdefault(tid, []).append(pid)
             if tid in self.league_of and pid not in self.club_of:
                 self.club_of[pid] = tid
+
+    def _tactics(self):
+        """formation of a team: Tactics.bin (12 byte: id | team | packed bits, 2 per team) points to TacticsFormation.bin (12 byte: id | position code | depth | width | place = set*16 + slot,
+        3 sets of 11 slots per id). Measured on 5,199 teams: the first record, set 0 fits the starting eleven of PlayerAssignment best (80 % of the slots have the same position; the others 60-73 %).
+        The packed bits (name, style) and the meaning of the other sets are not decoded. self.formation: team id -> 11 x (position code, depth 3..43, width 11..93), slot 0 = GK"""
+        self.formation = {}
+        try:
+            t = _unz(os.path.join(self.pesdb, 'Tactics.bin'))
+            f = _unz(os.path.join(self.pesdb, 'TacticsFormation.bin'))
+        except (OSError, ValueError, zlib.error):   # an older database folder without them: the club view falls back to the guess
+            return
+        first = {}
+        for o in range(0, len(t) - 11, 12):
+            k, tid, _g = struct.unpack_from('<III', t, o)
+            first.setdefault(tid, k)
+        want = set(first.values())
+        slots = {}
+        for o in range(0, len(f) - 11, 12):
+            k, code, depth, wide, place = struct.unpack_from('<IIBBH', f, o)
+            if k in want and place >> 4 == 0 and (place & 15) < 11:
+                slots.setdefault(k, {})[place & 15] = (code, depth, wide)
+        for tid, k in first.items():
+            if len(slots.get(k, ())) == 11:
+                self.formation[tid] = [slots[k][i] for i in range(11)]
 
     def players_of(self, tid):
         return [p for p in self.squad.get(tid, []) if p in self.pb.index]

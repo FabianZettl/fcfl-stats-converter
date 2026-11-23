@@ -782,7 +782,7 @@ def club_view(tid, youth=True):
         fm = json.load(open(os.path.join(DATA, 'formations-%s.json' % db_key()))).get(str(tid))
     except Exception:
         fm = None
-    return dict(ok=True, tid=tid, formation=fm, name=M.team.get(tid, ''), league=(M.leagues.get(M.league_of.get(tid)) or {}).get('name'), players=pl, found=sum(1 for x in pl if x['status'] == 'ok'), total=len(pl),
+    return dict(ok=True, tid=tid, formation=fm, layout=M.formation.get(tid), name=M.team.get(tid, ''), league=(M.leagues.get(M.league_of.get(tid)) or {}).get('name'), players=pl, found=sum(1 for x in pl if x['status'] == 'ok'), total=len(pl),
                 done=sum(1 for x in pl if x.get('done')))
 
 

@@ -125,6 +125,9 @@ document.addEventListener('click',e=>{const c=e.target.closest('.cl');if(c)openC
 async function openClub(t){document.querySelectorAll('.cl').forEach(x=>x.classList.toggle('on',+x.dataset.t===t));$('#main').innerHTML='<p class="mut">Loading …</p>';CLUB=await api('/api/club?tid='+t+'&youth='+(YB()?1:0));drawClub()}
 const PL={CB:0,LB:0,RB:0,DMF:1,CMF:2,LMF:2,RMF:2,AMF:3,SS:4,LWF:4,RWF:4,CF:4},PX={LB:0,LMF:0,LWF:0,RB:2,RMF:2,RWF:2};   // line of the pitch (back to front) and left / middle / right
 function clubPitch(xi){const card=(p,x,y)=>'<div class="pl prow" data-p="'+p.pid+'" style="left:'+x+'%;top:'+y+'%"><span class="jn">'+(p.no||'')+'</span><b>'+E(p.name.split(' ').slice(-1)[0])+'<em>'+p.ovr+'</em></b></div>',out=[];
+  const LY=CLUB.layout;
+  if(LY&&xi.length===11&&xi.every(p=>p.slot>=0&&p.slot<11))   // formation of the database itself (Tactics.bin): slot -> depth 3..43, width 11..93
+    return '<div class="cpitch">'+xi.map(p=>card(p,Math.round(LY[p.slot][2]*100/104),Math.round(91-(LY[p.slot][1]-3)*77/40))).join('')+'</div><div class="mut" style="font-size:.78rem;margin-top:6px">Formation of the database (first tactic)</div>';
   const gk=xi.filter(p=>p.pos==='GK')[0],rest=xi.filter(p=>p!==gk),fm=(CLUB.formation||'').split('-').map(Number);
   if(gk)out.push(card(gk,50,91));
   let lines;
