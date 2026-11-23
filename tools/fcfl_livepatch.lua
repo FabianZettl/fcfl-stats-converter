@@ -1,5 +1,5 @@
 -- FCFL live patch (experiment): writes changed player attributes into the player table(s) of the RUNNING game, no restart.
--- F6 = find the 380 byte player tables in memory (log only). F7 = apply <sider>\content\fcfl-livepatch\patch.txt to every table found.
+-- Open the Sider overlay (Space), switch to this module with the 1 key. F6 = find the 380 byte player tables in memory (log only). F7 = apply <sider>\content\fcfl-livepatch\patch.txt to every table found.
 -- patch.txt: one line per field "pid byte_offset bit_shift bit_width old new" (offsets of the 380 byte block), made by tools/livepatch_make.py.
 -- A field is only written when memory holds `old` (so a wrong layout or an already patched player is skipped). Everything is logged with times.
 local m = {}
@@ -22,7 +22,9 @@ local ctx_ref
 local RPM, REGIONS
 local tables = {}   -- { base, count, live, index }
 
+local last_msg = ""
 local function out(s)
+  last_msg = s
   log("fcfl_livepatch: " .. s)
 end
 
@@ -198,9 +200,15 @@ function m.key_down(ctx, vkey)
   end
 end
 
+-- Sider only delivers key_down while the overlay (Space) is on and this module is the one shown (switch with the 1 key)
+function m.overlay_on(ctx)
+  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch\n %s", last_msg)
+end
+
 function m.init(ctx)
   ctx_ref = ctx
   ctx.register("key_down", m.key_down)
+  ctx.register("overlay_on", m.overlay_on)
   out(string.format("ready (F6 = find tables, F7 = apply patch), ffi %s", RPM and "ok" or "MISSING"))
 end
 
