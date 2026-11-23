@@ -1,7 +1,7 @@
 """Patch file for the team objects of the running game (tools/fcfl_livepatch.lua, F12): squad order, shirt numbers and the two formations of the given teams, read from the database files.
 Object of team rank r (order of Team.bin) = base + r*1680: 40 x (pid u32, u32) from +0, 40 x u16 shirt numbers from +330, formation 1 and 2 (3 sets x (11 codes + 11 x depth,width) = 99 bytes) from +784 and +944.
-The base is found by the module from a team that is NOT in the patch ("LOC" line: its first formation). Usage: team_patch_make.py DBFOLDER OUT TEAMID [TEAMID ...] [--swap]
---swap swaps slots 1 and 2 of the first team (a test: the game must show it)."""
+The base is found by the module from a team that is NOT in the patch ("LOC" line: its first formation). Usage: team_patch_make.py DBFOLDER OUT TEAMID [TEAMID ...] [--swap=1:2,9:11]
+--swap=a:b,... swaps the squad entries a and b (0 = GK, 0..10 = starting eleven) of the FIRST team, with their shirt numbers."""
 import os
 import struct
 import sys
@@ -46,9 +46,13 @@ for n, tid in enumerate(ids):
     sq = sorted((M.lineup[(tid, p)][0], p) for p in M.squad[tid] if (tid, p) in M.lineup)
     pids = [p for _, p in sq][:40]
     nums = [M.lineup[(tid, p)][1] for p in pids]
-    if '--swap' in sys.argv and n == 0:
-        pids[1], pids[2] = pids[2], pids[1]
-        nums[1], nums[2] = nums[2], nums[1]
+    if n == 0:
+        for a in sys.argv:
+            if a.startswith('--swap='):
+                for pair in a[7:].split(','):
+                    x, y = map(int, pair.split(':'))
+                    pids[x], pids[y] = pids[y], pids[x]
+                    nums[x], nums[y] = nums[y], nums[x]
     lines.append('T %d %s' % (rank[tid], ' '.join(map(str, pids))))
     lines.append('N %d %s' % (rank[tid], ' '.join(map(str, nums))))
     for i, k in enumerate(kens.get(tid, [])[:2]):
