@@ -1,9 +1,9 @@
 -- FCFL live patch (experiment): writes changed player attributes into the player table(s) of the RUNNING game, no restart.
--- ScrollLock = find the 380 byte player tables in memory (log only). Pause = apply <sider>\content\fcfl-livepatch\patch.txt to every table found.
+-- F6 = find the 380 byte player tables in memory (log only). F7 = apply <sider>\content\fcfl-livepatch\patch.txt to every table found.
 -- patch.txt: one line per field "pid byte_offset bit_shift bit_width old new" (offsets of the 380 byte block), made by tools/livepatch_make.py.
 -- A field is only written when memory holds `old` (so a wrong layout or an already patched player is skipped). Everything is logged with times.
 local m = {}
-local KEY_FIND, KEY_APPLY = 0x91, 0x13
+local KEY_FIND, KEY_APPLY = 0x75, 0x76   -- F6 = find, F7 = apply
 local BLOCK, IDOFF = 0x17C, 0x30
 local ctx_ref
 local RPM, REGIONS
@@ -188,7 +188,7 @@ end
 function m.init(ctx)
   ctx_ref = ctx
   ctx.register("key_down", m.key_down)
-  out(string.format("ready (ScrollLock = find tables, Pause = apply patch), ffi %s", RPM and "ok" or "MISSING"))
+  out(string.format("ready (F6 = find tables, F7 = apply patch), ffi %s", RPM and "ok" or "MISSING"))
 end
 
 return m
