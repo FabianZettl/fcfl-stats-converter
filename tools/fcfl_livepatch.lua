@@ -21,6 +21,7 @@ local BLOCK, IDOFF = 0x17C, 0x30
 local ctx_ref
 local RPM, REGIONS, FFI
 local tables = {}   -- { base, count, live, index }
+local LAST = {}     -- needle name -> first hit of the last F10 search
 
 local last_msg = ""
 local function out(s)
@@ -346,6 +347,7 @@ local function needles_search()
   end
   for _, nd in ipairs(list) do
     out(string.format("needle %s (%d bytes): %d hit(s)", nd.name, #nd.s, #nd.hits))
+    LAST[nd.name] = nd.hits[1]
     local groups, order = {}, {}
     for _, a in ipairs(nd.hits) do
       local ctx_bytes = RPM(a - BEF, BEF + AFT) or RPM(a, #nd.s) or ""
@@ -365,6 +367,24 @@ local function needles_search()
   out(string.format("needles done in %.2f s", os.clock() - t0))
 end
 
+
+-- F11: write the memory around the first hit of fm_codes and squad_by_slot4 (from the last F10 search) to content\\fcfl-livepatch\\dump-<name>.bin for offline analysis.
+-- The log line says the start address. 64 KB pieces that cannot be read are filled with zeros.
+local function dump_around(name, before, size)
+  local a = LAST[name]
+  if not a then out("dump: no hit for " .. name .. " (press F10 first)"); return end
+  local base = math.max(0x10000, a - before)
+  local f = io.open(ctx_ref.sider_dir .. "content\\fcfl-livepatch\\dump-" .. name .. ".bin", "wb")
+  if not f then out("dump: cannot write the file"); return end
+  local bad, PIECE = 0, 0x10000
+  for o = 0, size - 1, PIECE do
+    local s = RPM(base + o, PIECE)
+    if s then f:write(s) else f:write(string.rep("\0", PIECE)); bad = bad + 1 end
+  end
+  f:close()
+  out(string.format("dump %s: start 0x%X, hit at 0x%X (offset %d), %d bytes, %d unreadable piece(s)", name, base, a, a - base, size, bad))
+end
+
 function m.key_down(ctx, vkey)
   vkey = tonumber(vkey)
   if vkey == KEY_FIND then
@@ -373,6 +393,9 @@ function m.key_down(ctx, vkey)
     find_tables(lines[1][1])
   elseif vkey == 0x77 then   -- F8
     local ok, e = pcall(probe)
+    if not ok then out("ERROR " .. tostring(e)) end
+  elseif vkey == 0x7A then   -- F11
+    local ok, e = pcall(function() dump_around("fm_codes", 0x80000, 0x400000); dump_around("squad_by_slot4", 0x80000, 0x400000) end)
     if not ok then out("ERROR " .. tostring(e)) end
   elseif vkey == 0x79 then   -- F10
     local ok, e = pcall(needles_search)
@@ -388,7 +411,7 @@ end
 
 -- Sider only delivers key_down while the overlay (Space) is on and this module is the one shown (switch with the 1 key)
 function m.overlay_on(ctx)
-  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe tables  [F9] apply tables  [F10] needles\n %s", last_msg)
+  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe tables  [F9] apply tables  [F10] needles  [F11] dump\n %s", last_msg)
 end
 
 function m.init(ctx)
