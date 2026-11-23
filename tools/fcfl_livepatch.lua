@@ -3,6 +3,19 @@
 -- patch.txt: one line per field "pid byte_offset bit_shift bit_width old new" (offsets of the 380 byte block), made by tools/livepatch_make.py.
 -- A field is only written when memory holds `old` (so a wrong layout or an already patched player is skipped). Everything is logged with times.
 local m = {}
+
+-- Sider's Lua has no pcall in some builds (PlayerDump has the same shim): fall back to xpcall, then to a plain call
+local pcall = pcall
+if not pcall then
+  if xpcall then
+    pcall = function(f, ...)
+      local a = { ... }
+      return xpcall(function() return f(unpack and unpack(a) or table.unpack(a)) end, function(e) return e end)
+    end
+  else
+    pcall = function(f, ...) return true, f(...) end
+  end
+end
 local KEY_FIND, KEY_APPLY = 0x75, 0x76   -- F6 = find, F7 = apply
 local BLOCK, IDOFF = 0x17C, 0x30
 local ctx_ref
