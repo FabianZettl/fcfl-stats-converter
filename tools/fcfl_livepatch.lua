@@ -19,7 +19,7 @@ end
 local KEY_FIND, KEY_APPLY = 0x75, 0x76   -- F6 = find, F7 = apply
 local BLOCK, IDOFF = 0x17C, 0x30
 local ctx_ref
-local RPM, REGIONS
+local RPM, REGIONS, FFI
 local tables = {}   -- { base, count, live, index }
 
 local last_msg = ""
@@ -31,6 +31,7 @@ end
 do
   local ffi = ffi
   if ffi == nil and type(require) == "function" then local ok, r = pcall(require, "ffi"); if ok then ffi = r end end
+  FFI = ffi
   if ffi then
     pcall(ffi.cdef, [[
       void* FP_GetCurrentProcess(void) __asm__("GetCurrentProcess");
@@ -189,10 +190,22 @@ local function apply()
 end
 
 
--- F8: do the other database tables sit in memory as an unchanged image of their file? Needs raw\<name>.raw (tools/export_raw.py). Only reads.
+-- Tables that sit in memory as an unchanged image of their database file (found by the F8 probe): PlayerAssignment, Tactics, TacticsFormation, Team, Competition,
+-- CompetitionEntry. raw\\<name>.raw = decompressed file (the converter writes them after every change, or tools/export_raw.py).
+-- F8 = look for the images and log how many rows are identical (reads only). F9 = write every row that differs from the new file into the image, then check.
 local PROBES = { { "PlayerAssignment", 16 }, { "Tactics", 12 }, { "TacticsFormation", 12 }, { "Team", 1532 }, { "Competition", 36 }, { "CompetitionEntry", 12 } }
 
-local function probe()
+local function rows_same(mem, raw, n, rs)
+  local same = 0
+  for r = 0, n - 1 do
+    local o = r * rs
+    if mem:sub(o + 1, o + rs) == raw:sub(o + 1, o + rs) then same = same + 1 end
+  end
+  return same
+end
+
+-- returns items { name, rs, n, raw, images = { {base, mem, same} ... } } ; images = places in memory where the file is found (>= 50 % of the rows identical)
+local function find_images()
   local t0 = os.clock()
   local dir = ctx_ref.sider_dir .. "content\\fcfl-livepatch\\raw\\"
   local items, needles = {}, {}
@@ -201,17 +214,20 @@ local function probe()
     if f then
       local raw = f:read("*a"); f:close()
       local rs, n = P[2], math.floor(#raw / P[2])
-      local it = { name = P[1], rs = rs, n = n, raw = raw, hits = {} }
+      local it = { name = P[1], rs = rs, n = n, raw = raw, hits = {}, images = {} }
+      -- the module's own copy of the file (a Lua string) is found by the scan as well: remember where it is and leave it out
+      it.own = {}
+      local okp, pa = pcall(function() return tonumber(FFI.cast("uintptr_t", FFI.cast("const char*", raw))) end)
+      if okp and pa then it.own[pa] = true; out(string.format("%s: the module's own copy of the file is @0x%X (left out)", P[1], pa)) end
       items[#items + 1] = it
-      for _, fr in ipairs({ 0.3, 0.5, 0.7 }) do
+      for _, fr in ipairs({ 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9 }) do   -- several samples: a row the converter just changed does not match
         local k = math.floor(n * fr)
         needles[#needles + 1] = { it = it, k = k, s = raw:sub(k * rs + 1, (k + 4) * rs) }
       end
     else
-      out("probe: no raw file for " .. P[1])
+      out("no raw file for " .. P[1])
     end
   end
-  if #items == 0 then out("probe: nothing exported, run tools/export_raw.py"); return end
   local CH, OV = 0x400000, 0x2000
   local regs = REGIONS(0x1000)
   for _, rg in ipairs(regs) do
@@ -225,34 +241,63 @@ local function probe()
             local h = s:find(nd.s, init, true)
             if not h then break end
             init = h + 1
-            if h - 1 < CH and #nd.it.hits < 12 then nd.it.hits[#nd.it.hits + 1] = rg[1] + off + h - 1 - nd.k * nd.it.rs end
+            if h - 1 < CH and #nd.it.hits < 40 then nd.it.hits[#nd.it.hits + 1] = rg[1] + off + h - 1 - nd.k * nd.it.rs end
           end
         end
       end
       off = off + CH
     end
   end
-  out(string.format("probe: scanned %d regions in %.2f s", #regs, os.clock() - t0))
   for _, it in ipairs(items) do
-    local seen, any = {}, false
+    local seen = {}
     for _, base in ipairs(it.hits) do
-      if not seen[base] and base > 0x10000 then
+      if not seen[base] and base > 0x10000 and not it.own[base] then
         seen[base] = true
         local mem = RPM(base, it.n * it.rs)
-        local same = 0
+        if mem then
+          local same = rows_same(mem, it.raw, it.n, it.rs)
+          if same * 2 >= it.n then it.images[#it.images + 1] = { base = base, same = same } end
+        end
+      end
+    end
+  end
+  out(string.format("images searched in %d regions in %.2f s", #regs, os.clock() - t0))
+  return items
+end
+
+local function probe()
+  for _, it in ipairs(find_images()) do
+    if #it.images == 0 then out("probe " .. it.name .. ": no image of the file in memory (the game converts it)") end
+    for _, im in ipairs(it.images) do
+      out(string.format("probe %s: image @0x%X, %d of %d rows identical to the file", it.name, im.base, im.same, it.n))
+    end
+  end
+end
+
+local function apply_tables()
+  local t0 = os.clock()
+  for _, it in ipairs(find_images()) do
+    if #it.images == 0 then out(it.name .. ": no image found (not written)")
+    else
+      for _, im in ipairs(it.images) do
+        local mem = RPM(im.base, it.n * it.rs)
+        local w, bad = 0, 0
         if mem then
           for r = 0, it.n - 1 do
             local o = r * it.rs
-            if mem:sub(o + 1, o + it.rs) == it.raw:sub(o + 1, o + it.rs) then same = same + 1 end
+            local row = it.raw:sub(o + 1, o + it.rs)
+            if mem:sub(o + 1, o + it.rs) ~= row then
+              if pcall(memory.write, im.base + o, row) then w = w + 1 else bad = bad + 1 end
+            end
           end
         end
-        any = true
-        out(string.format("probe %s: image @0x%X, %d of %d rows identical to the file", it.name, base, same, it.n))
+        local after = RPM(im.base, it.n * it.rs)
+        local same = after and rows_same(after, it.raw, it.n, it.rs) or -1
+        out(string.format("%s @0x%X: %d row(s) written, %d failed, now %d of %d rows identical to the file", it.name, im.base, w, bad, same, it.n))
       end
     end
-    if not any then out("probe " .. it.name .. ": no image of the file in memory (the game converts it)") end
   end
-  out(string.format("probe done in %.2f s", os.clock() - t0))
+  out(string.format("tables done in %.2f s", os.clock() - t0))
 end
 
 function m.key_down(ctx, vkey)
@@ -264,6 +309,9 @@ function m.key_down(ctx, vkey)
   elseif vkey == 0x77 then   -- F8
     local ok, e = pcall(probe)
     if not ok then out("ERROR " .. tostring(e)) end
+  elseif vkey == 0x78 then   -- F9
+    local ok, e = pcall(apply_tables)
+    if not ok then out("ERROR " .. tostring(e)) end
   elseif vkey == KEY_APPLY then
     local ok, e = pcall(apply)
     if not ok then out("ERROR " .. tostring(e)) end
@@ -272,7 +320,7 @@ end
 
 -- Sider only delivers key_down while the overlay (Space) is on and this module is the one shown (switch with the 1 key)
 function m.overlay_on(ctx)
-  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe other tables\n %s", last_msg)
+  return string.format(" FCFL live patch  [F6] find tables  [F7] apply patch  [F8] probe tables  [F9] apply tables\n %s", last_msg)
 end
 
 function m.init(ctx)
