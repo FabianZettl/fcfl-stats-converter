@@ -59,6 +59,9 @@ def add(text, ea_db, path):
         if sofifa.missing_fm(raw, gk):
             rep.append(dict(name=name, ok=False, msg='incomplete page' if gk else 'goalkeeper or incomplete page'))
             continue
+        if sofifa.missing(ea_db.stats(row, gk), gk):   # the entry of the standard database has holes (no attribute values for this player)
+            rep.append(dict(name=name, ok=False, msg='the EA FC entry is incomplete'))
+            continue
         if gk:   # keepers: both sides as the converter makes them (keeper model for EA FC, the keeper branch for FM), all 25 attributes, own fit
             ea = gkcal.convert_gk(ea_db.stats(row, True), row['height'])
             fm = sofifa.convert_fm(raw, True, 0, raw.get('overall'))

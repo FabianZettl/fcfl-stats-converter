@@ -153,7 +153,9 @@ def read_update(path):
         pos = [_DE_POS[t] for t in re.findall(r'[A-Z]+', r.get('Positionen') or '') if t in _DE_POS]
         h = re.search(r'(\d+)\s*cm', r.get('Größe') or '')
         w = re.search(r'(\d+)\s*kg', r.get('Gewicht') or '')
-        n = dict(base_id=r['ID'].strip(), stats_id=r['ID'].strip(), first_name=' '.join(parts[:-1]) or full, last_name=parts[-1] if len(parts) > 1 else '', full_name=full, common_name='',
+        short = (r.get('Name') or '').strip()
+        common = '' if re.match(r'^(?:[^\W\d_]\.\s*)+', short) or fold(short) == fold(full) else short   # a name the player is known by (Neymar, Carlos Augusto); 'K. Mbappé' is only an abbreviation
+        n = dict(base_id=r['ID'].strip(), stats_id=r['ID'].strip(), first_name=parts[0] if len(parts) > 1 else full, last_name=' '.join(parts[1:]), full_name=full, common_name=common,   # the legal full name: the first word, then the rest (every part of it is indexed as a surname)
                  nation_name=_country((r.get('Nationalität') or '').strip()), club_name=(r.get('Verein') or '').strip(), position=pos[0] if pos else '',
                  position_alt=pos[1] if len(pos) > 1 else '', position_alt_2=pos[2] if len(pos) > 2 else '', position_alt_3=pos[3] if len(pos) > 3 else '',
                  rating=str(_int(r['Gesamtbewertung'])), potential=str(_int(r.get('Potenzial')) or ''), height=h.group(1) if h else '', weight=w.group(1) if w else '',
@@ -201,6 +203,7 @@ class DB:
         """path: the standard database; updates: update_files(...) - a player of an update replaces the player of the same base_id when its snapshot (else the date of the file) is not older"""
         self.path = path
         PS_UNKNOWN.clear()   # counted again while this database is read
+        self.base_tag = '%s-%d' % (os.path.basename(path), os.path.getsize(path))   # a replaced standard database makes the players that were converted from the old one 'convert again'
         self.rows = []
         self.by_full = {}
         self.by_last = {}

@@ -46,7 +46,7 @@ DATA = default_data_dir()   # settings, backups, the copy of the original Player
 DEF = dict(
     pesdb='',
     plan='',
-    csv=os.path.join(HERE, 'data', 'fc27-players.csv'),
+    csv=os.path.join(HERE, 'data', 'sofifa-base.csv'),
     fmcal=os.path.join(DATA, 'fm_calib.json'),
     backups=os.path.join(DATA, 'backups'),
     journal=os.path.join(DATA, 'converted.json'),
@@ -452,11 +452,20 @@ def fm_row(pid):
     return r if r is not None and fmdb.plausible(r, pos_of(pid)) else None   # a row that does not fit his position is another player
 
 
+def sofifa_missing(row, pos):
+    """attribute values of the EA FC / SoFIFA entry that the conversion needs and the entry does not have"""
+    return convert.sofifa.missing(EA.stats(row, pos == 0), pos == 0)
+
+
 def convertible(pid):
     """a player the tool can convert by itself: found unambiguously in EA FC, or not in EA FC at all but with every attribute in the FM list"""
-    st = match(pid)['status']
+    m = match(pid)
+    st = m['status']
     if st == 'ok':
-        return True
+        if not sofifa_missing(m['row'], pos_of(pid)):
+            return True
+        fr = fm_row(pid)   # holes in the entry: only when the FM list can do it
+        return fr is not None and fmdb.complete(fr)
     if st not in ('none', 'ambiguous'):   # an uncertain EA FC match counts as not found: the FM list takes over
         return False
     fr = fm_row(pid)
@@ -599,7 +608,7 @@ def base_csv():
     if found:
         return max(found)[2]
     shipped = os.path.join(HERE, 'data', 'sofifa-base.csv')
-    return shipped if os.path.isfile(shipped) else os.path.join(HERE, 'data', 'fc27-players.csv')
+    return shipped
 
 
 EAR = dict(t=0, sig=None)
@@ -692,6 +701,8 @@ def sig_of(pid, src, youth):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
+    if src == 'EA FC' and m['status'] == 'ok':
+        sid += '|' + getattr(EA, 'base_tag', '')
     if src == 'EA FC' and m['status'] == 'ok' and m['row'].get('upd'):   # the values come from a SoFIFA update: new values convert the player again (rows of the standard database keep their signature)
         sid += '|' + hashlib.md5(repr(sorted(m['row']['raw'].items())).encode()).hexdigest()[:10]
     if src == 'FM list':   # the row of the list and its values: a new export of the list converts the player again
@@ -1054,6 +1065,8 @@ def preview(body):
     fm_ok = fmr is not None and fmdb.complete(fmr)
     from_list = False
     want = body.get('source') or SRC.get(str(pid))   # the tab of the player page / what the user chose for this player before
+    if row is not None and not fm and fm_ok and sofifa_missing(row, pos_of(pid)):   # the standard database has holes for this player: the FM list takes over
+        want = 'fm'
     if want == 'fm' and not fm and fm_ok:   # EA FC has him, but the user wants the FM values
         fm, row, from_list = fmdb.page_text(fmr), None, True
     if not fm and row is None and fmr is not None and fmdb.complete(fmr) and match(pid)['status'] in ('none', 'ambiguous'):   # no EA FC / SoFIFA data, or an uncertain match (the page still offers the EA FC candidates): the FM list is the fallback, converted like a pasted FMInside page

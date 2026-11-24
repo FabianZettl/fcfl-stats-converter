@@ -32,11 +32,12 @@ assert fcdb.PS_UNKNOWN.get('Vereinstreue Spielerin') == 1   # a name that is not
 assert a['raw']['acceleration_type'] == 'Controlled Explosive' and a['raw']['emotion'] == 'Calm' and a['raw']['growth_profile'] == 'Late Bloomer'
 assert a['raw']['loan_from'] == 'River Plate' and a['raw']['value'] == '€32.5M'
 assert a['name'] == 'Anna Alpha' and a['raw']['first_name'] == 'Anna' and a['upd'] and a['raw']['snapshot'] == '24-11-2026'
-assert c['rating'] == 70 and c['nation'] == 'Brazil' and c['pos'] == 'GK' and c['raw']['first_name'] == 'Carl Van' and c['raw']['last_name'] == 'Neu'
+assert c['rating'] == 70 and c['nation'] == 'Brazil' and c['pos'] == 'GK' and c['raw']['first_name'] == 'Carl' and c['raw']['last_name'] == 'Van Neu' and c['raw']['common_name'] == ''   # 'C. Neu' is an abbreviation: no common name; every part of the surname is indexed
 assert 'sprint_speed' not in c['raw']   # N/A
 assert c['raw']['loan_from'] == '' and c['raw']['contract'] == '2024 ~ 2029' and c['raw']['emotion'] == '' and c['raw']['growth_profile'] == ''   # no loan, PLAYER_EMOTION_0 and N/A are no values
 assert len(g) == 2   # the row without a rating is left out
 assert fcdb.read_update(base)   # the EA FC export itself is read as well
+assert [x['name'] for x in fcdb.DB(os.path.join(up, 'sofifa-updates-270007-2026-11-24.csv')).search('van neu')] == ['Carl Van Neu']   # found by a part of the legal name
 other = os.path.join(d, 'other.csv')
 open(other, 'w').write('a;b\n1;2\n')
 assert fcdb.read_update(other) is None   # no export of SoFIFA

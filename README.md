@@ -65,7 +65,7 @@ The standard database can be the **German SoFIFA export of all players** (`sofif
 
 ## SoFIFA updates (new player values, loaded live)
 
-SoFIFA sends CSV files with updated player values: the EA FC export (the columns of `fc27-players.csv`) or the **German SoFIFA export** (`ID;Name;Vollständiger Name;…;Gesamtbewertung;…`, as `sofifa-updates-270007-2026-11-24.csv`; the date is read from the file name). From the German export the rating, potential, club, nation, positions, height, weight, foot, weak foot and the 34 attribute values are taken over; the PlayStyles stay those of the standard database (their German names are not translated). **Tools > SoFIFA update** loads one or several of them, or you copy them into the folder `ea-updates` of the data folder; the tool picks them up within 10 seconds, no restart. For every player the **newest row** counts: a row with a newer snapshot (the `snapshot` column; else the date in the file name, else the day the file was changed) replaces an older update and the standard database, an older row never replaces a newer one, players that the standard database does not have are added. Eight updates in any order are fine. The start page lists every update with its date and how many players it supplies; the player page says "EA FC rating (SoFIFA update 24.11.2026)", and a player whose values changed shows *convert again*.
+SoFIFA sends CSV files with updated player values: the EA FC export (columns `base_id`, `rating`, …) or the **German SoFIFA export** (`ID;Name;Vollständiger Name;…;Gesamtbewertung;…`, as `sofifa-updates-270007-2026-11-24.csv`; the date is read from the file name). From the German export the rating, potential, club, nation, positions, height, weight, foot, weak foot and the 34 attribute values are taken over; the PlayStyles stay those of the standard database (their German names are not translated). **Tools > SoFIFA update** loads one or several of them, or you copy them into the folder `ea-updates` of the data folder; the tool picks them up within 10 seconds, no restart. For every player the **newest row** counts: a row with a newer snapshot (the `snapshot` column; else the date in the file name, else the day the file was changed) replaces an older update and the standard database, an older row never replaces a newer one, players that the standard database does not have are added. Eight updates in any order are fine. The start page lists every update with its date and how many players it supplies; the player page says "EA FC rating (SoFIFA update 24.11.2026)", and a player whose values changed shows *convert again*.
 
 ## FM list (FMInside export) as fallback and filler
 
@@ -118,8 +118,8 @@ If your `Player.bin` was already changed by another tool when you start, that ch
 
 ## Data
 
-`flconv/data/fc27-players.csv` is a data set of EA SPORTS FC 27 ratings (17,849 male players, snapshot 12 Sep 2026). **Sources and licenses:** [DATA.md](DATA.md).
-You can use another export with `--csv file.csv` (same columns, see DATA.md).
+`flconv/data/sofifa-base.csv` is the German SoFIFA export of all players (19,594 rows, snapshot 24 Nov 2026; EA SPORTS FC 27 values with potential, PlayStyles, growth profile, contracts, loans). It replaces the earlier `fc27-players.csv`; updates follow as CSV files (see *SoFIFA updates*). **Sources and licenses:** [DATA.md](DATA.md).
+You can use another base with `--csv file.csv` or by putting it into the folder `ea-base` of the data folder.
 
 ## Notes
 
