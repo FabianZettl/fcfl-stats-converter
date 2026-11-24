@@ -38,18 +38,28 @@ class FMList:
     def __len__(self):
         return len(self.rows)
 
-    def find(self, name, club=None, age=None):
-        """the one player of the list for a player of the database (name; several with the name: the club, then the age), or None. The age may differ by 3 years at most."""
+    def find(self, name, club=None, age=None, height=None):
+        """the player of the list for a player of the database, or None. Candidates have his name; each gets points for what fits (club, age, height) and loses points for what does
+        not: club (some word of the club name is the same) +2, unknown or another club 0 (players move); age 0 / 1 / 2 / more years apart +2 / +1 / -1 / -3; height within 2 cm / 5 cm / more
+        +2 / 0 / -2. The best one is taken when it has at least 0 points and is at least one point ahead of the next."""
         c = list(self.by_name.get(fcdb.fold(name), []))
-        if len(c) > 1 and club:
-            ck = fcdb.club_key(club)
-            c = [r for r in c if fcdb.club_key(r.get('Club')) == ck] or c
-        if len(c) > 1 and age is not None:
-            c = [r for r in c if _int(r.get('Age')) is not None and abs(_int(r['Age']) - age) <= 1] or c
-        if len(c) != 1:
+        if not c:
             return None
-        a = _int(c[0].get('Age'))
-        return c[0] if age is None or a is None or abs(a - age) <= 3 else None
+        ck = fcdb.club_key(club) if club else frozenset()
+        sc = []
+        for r in c:
+            v = 2 if ck and ck & fcdb.club_key(r.get('Club')) else 0
+            a = _int(r.get('Age'))
+            if age is not None and a is not None:
+                v += {0: 2, 1: 1, 2: -1}.get(abs(a - age), -3)
+            h = height_of(r)
+            if height and h:
+                v += 2 if abs(h - height) <= 2 else 0 if abs(h - height) <= 5 else -2
+            sc.append((v, r))
+        sc.sort(key=lambda x: -x[0])
+        if sc[0][0] < 0 or (len(sc) > 1 and sc[0][0] - sc[1][0] < 1):
+            return None
+        return sc[0][1]
 
 
 def _int(v):
@@ -129,6 +139,11 @@ def weak_foot(r):
 def foot(r):
     f = (r.get('Footedness') or '').strip().capitalize()
     return f if f in ('Left', 'Right') else None
+
+
+def height_of(r):
+    h = _int(r.get('Height'))
+    return h if h and 100 <= h <= 250 else None
 
 
 def height(r):

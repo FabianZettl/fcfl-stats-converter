@@ -56,4 +56,12 @@ lv = fmdb.positions(bruno, cur)
 assert lv[5] == 2 and lv[8] == 2          # accomplished keeps his CMF 2, natural AMF 2
 assert lv[6] == 0 and lv[9] == 1 and lv[4] == 0   # ML unavailable: lost; AML competent keeps 1; DM competent never adds
 assert fmdb.positions(bruno)[5] == 1 and fmdb.positions(bruno, [0] * 13)[5] == 1 and fmdb.positions(bruno, [0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0])[9] == 1   # without levels: accomplished 1; competent 2 -> 1
+# points: club, age, height (the club alone is not needed: players move)
+two = fmdb.FMList([folder])
+row_a, row_b = two.rows['2'], two.rows['3']
+assert two.find('Ahmed Ali', None, 25, 178)['UID'] == '2' and two.find('Ahmed Ali', None, 30, 178)['UID'] == '3'
+assert two.find('Kylian Mbappé', 'Bayern München', 27, 178) is not None        # another club, but age and height fit
+assert two.find('Kylian Mbappé', 'R. Madrid', 27, 195) is not None             # 17 cm off, but club and age fit (2 + 2 - 2 = 2)
+assert two.find('Kylian Mbappé', 'Bayern München', 29, 195) is None            # nothing fits: another player with the same name
+assert two.find('Kylian Mbappé', None, 28, 190) is None                        # no club, age 1 year off (+1), height 12 cm off (-2): -1 points
 print('ok')

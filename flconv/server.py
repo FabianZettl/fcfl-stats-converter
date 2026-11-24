@@ -415,7 +415,7 @@ def fm_list():
 def fm_row(pid):
     """the row of the FM list for a player of the database, or None"""
     l = fm_list()
-    r = l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid)) if len(l) else None
+    r = l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid), M.height.get(pid)) if len(l) else None
     return r if r is not None and fmdb.plausible(r, pos_of(pid)) else None   # a row that does not fit his position is another player
 
 
