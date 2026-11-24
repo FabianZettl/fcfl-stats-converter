@@ -75,7 +75,7 @@ details.fold{margin:8px 0;border:1px solid var(--line);border-radius:12px;backgr
 <div><b>2</b><h3>Add live data</h3><p>In the club: <i>Line-up from Sofascore</i> (starting eleven, bench, shirt numbers) and <i>Performance since 01.09.</i> (rating and stats move single values a little).</p></div>
 <div><b>3</b><h3>Convert</h3><p><i>Convert the club</i> writes the new values: EA overall, youth bonus, profile, skills, playing style, live data, as set in <i>Conversion options</i>.</p></div></div>
 <h3 class="mut" style="margin:22px 0 8px;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase">Tools</h3>
-<div class="steps tools"><div class="tl" data-b="allB2"><h3>Convert the whole database</h3><p>Every club at once, with a preview.</p></div><div class="tl" data-b="misB2"><h3>Not found in the database</h3><p>Players without an EA FC match, to assign by hand.</p></div><div class="tl" data-b="fmcB"><h3>FM calibration</h3><p>Samples for FMInside pages.</p></div><div class="tl" data-b="bkB"><h3>Backups</h3><p>Restore an earlier Player.bin.</p></div></div></div>
+<div class="steps tools"><div class="tl" data-b="allB2"><h3>Convert the whole database</h3><p>Every club at once, with a preview.</p></div><div class="tl" data-b="misB2"><h3>Not found in the database</h3><p>Players without an EA FC match, to assign by hand.</p></div><div class="tl" data-b="fmcB"><h3>FM calibration</h3><p>Samples for FMInside pages.</p></div><div class="tl" data-b="eaB"><h3>SoFIFA update</h3><p>Load a CSV with new player values.</p><button id="eaB" hidden></button><input type="file" id="eaF" accept=".csv" multiple hidden></div><div class="tl" data-b="bkB"><h3>Backups</h3><p>Restore an earlier Player.bin.</p></div></div></div>
 </div>
 <div class="drawer" id="dr"><div class="panel" id="pn"></div></div>
 <div class="dlg" id="dl"><div class="in" id="dli"></div></div>
@@ -115,7 +115,7 @@ $('#gsr').addEventListener('click',async e=>{const i=e.target.closest('.gsi');if
   if(i.dataset.t){const lg=$('#lg');if(lg.value!==i.dataset.l){lg.value=i.dataset.l;lg.dispatchEvent(new Event('change'));await new Promise(r=>{const t=setInterval(()=>{if(document.querySelector('.cl')){clearInterval(t);r()}},100)})}openClub(+i.dataset.t)}
   else if(i.dataset.p)openPlayer(+i.dataset.p)});
 document.addEventListener('click',e=>{if(!e.target.closest('#gs,#gsr'))$('#gsr').style.display='none'});
-async function init(){const r=await api('/api/init');LG=r.leagues;$('#info').innerHTML=r.players.toLocaleString()+' players in the database<br>'+r.ea.toLocaleString()+' players in '+E(r.csv)+'<br>'+r.fm.toLocaleString()+' players in the FM database'+(r.fm?' ('+r.fm_values.toLocaleString()+' with all values)':'');
+async function init(){const r=await api('/api/init');LG=r.leagues;$('#info').innerHTML=r.players.toLocaleString()+' players in the database<br>'+r.ea.toLocaleString()+' players in '+E(r.csv)+(r.ea_updates||[]).map(u=>'<br>+ update of '+E(u.date)+' ('+u.used.toLocaleString()+' players)').join('')+'<br>'+r.fm.toLocaleString()+' players in the FM database'+(r.fm?' ('+r.fm_values.toLocaleString()+' with all values)':'');
   $('#lg').innerHTML='<option value="">Choose a league …</option>'+LG.map(l=>'<option value="'+l.id+'">'+E(l.name)+' ('+l.n+')</option>').join('');  lpCheck()}
 async function lpCheck(){const r=await api('/api/livepatch');if(!r.ok||r.state!=='ask'||r.hidden||$('#lpB'))return;
   document.body.insertAdjacentHTML('beforeend','<div id="lpB" class="msg ok" style="position:fixed;right:18px;bottom:18px;max-width:440px;z-index:60;background:var(--surface);box-shadow:0 6px 24px #0008"><b>New: load changes into the running game</b>'
@@ -169,6 +169,10 @@ async function refreshPlayer(pid){if(CLUB){const r=await api('/api/prow?pid='+pi
     const c=document.querySelector('.cl[data-t="'+CLUB.tid+'"] small');if(c)c.textContent=CLUB.found+'/'+CLUB.players.length}}
   if($('#dr').classList.contains('on'))await openPlayer(pid)}
 document.addEventListener('click',e=>{const t=e.target.closest('.tl');if(t&&$('#'+t.dataset.b))$('#'+t.dataset.b).click()});
+$('#eaB').onclick=()=>$('#eaF').click();
+$('#eaF').onchange=async e=>{const fs=[...e.target.files];if(!fs.length)return;const d=$('#dl'),H='<h2 style="font-size:1.4rem;text-transform:none;color:var(--text)">SoFIFA update</h2>';d.classList.add('on');$('#dli').innerHTML=H+'<p class="mut">Loading …</p>';const out=[];
+  for(const f of fs){const r=await api('/api/eaupdate',{name:f.name,text:await f.text()});out.push(r.ok?'<div class="msg ok"><b>'+E(r.name)+'</b> · update of '+E(r.date)+' · '+r.rows.toLocaleString()+' players, '+r.used.toLocaleString()+' of them are now used (not older than the standard database and the earlier updates)</div>':'<div class="msg err">'+E(f.name)+': '+E(r.msg||'failed')+'</div>')}
+  e.target.value='';$('#dli').innerHTML=H+out.join('')+'<p class="mut">Players whose values changed show "convert again".</p><div class="foot"><button class="btn ghost" id="bC">Close</button></div>';$('#bC').onclick=()=>d.classList.remove('on');init()};
 document.addEventListener('click',e=>{const c=e.target.closest('.prow');if(c&&c.dataset.p)openPlayer(+c.dataset.p)});
 function formBox(f){if(!f)return '';const A={pass:'Passing',dribble:'Dribbling',defensive:'Defending',shot:'Shooting',goalkeeper:'Goalkeeping'};
   const at=Object.entries(f.attr||{});
@@ -200,7 +204,7 @@ const radar=r=>{const by={};r.rows.forEach(x=>by[x.attr]=x);const gk=r.pos===0;
 const money=v=>v==null?'–':(v>=1e6?'€'+(v/1e6).toFixed(v>=1e7?0:1)+'M':'€'+Math.round(v/1e3)+'K');
 const headBox=(r,nm)=>{const I=r.info||{},G=r.gaffer||{};const bd=I.birthdate?I.birthdate.split('-').join('.'):'';const pm=POSN[r.pos_main];
   const tiles=[['<span class="vb '+vcls(r.ovr_new)+'">'+r.ovr_new+'</span>','Overall rating <small>(now '+r.ovr_cur+')</small>'],
-    r.ovr_target!=null&&r.ovr_target!==r.ovr_new?['<span class="vb '+vcls(r.ovr_target)+'">'+r.ovr_target+'</span>','Target / EA FC']:(I.rating?['<span class="vb '+vcls(I.rating)+'">'+I.rating+'</span>','EA FC rating']:I.src==='FM'&&I.fm_ability?['<span class="vb '+vcls(I.fm_ability)+'">'+I.fm_ability+'</span>','FM ability']:null),
+    r.ovr_target!=null&&r.ovr_target!==r.ovr_new?['<span class="vb '+vcls(r.ovr_target)+'">'+r.ovr_target+'</span>','Target / EA FC']:(I.rating?['<span class="vb '+vcls(I.rating)+'">'+I.rating+'</span>','EA FC rating'+(r.db&&r.db.upd&&r.db.upd_date&&r.db.upd_date.length?' <small>(SoFIFA update '+String(r.db.upd_date[2]).padStart(2,'0')+'.'+String(r.db.upd_date[1]).padStart(2,'0')+'.'+r.db.upd_date[0]+')</small>':'')]:I.src==='FM'&&I.fm_ability?['<span class="vb '+vcls(I.fm_ability)+'">'+I.fm_ability+'</span>','FM ability']:null),
     (I.potential||I.fm_potential&&I.src==='FM'||G.pot)?['<span class="vb '+vcls(I.potential||(I.src==='FM'&&I.fm_potential)||G.pot)+'">'+(I.potential||(I.src==='FM'&&I.fm_potential)||G.pot)+'</span>','Potential'+(I.potential?'':I.src==='FM'&&I.fm_potential?' <small>(FM)</small>':' <small>(game)</small>')]:null,
     G.mv!=null?['<span class="tv">'+money(G.mv)+'</span>','Value']:null,G.sal!=null?['<span class="tv">'+money(G.sal)+'</span>','Wage / year']:null].filter(Boolean);
   return '<div class="hd2">'+face(PID)+'<div style="flex:1"><h2>'+E(nm)+'</h2><div class="sub">'+(I.full&&I.full!==nm?'<span>'+E(I.full)+'</span>':'')+'<span class="pos-tag">'+E(pm)+(I.ea_pos&&I.ea_pos!==pm?' <small class="mut">(EA '+E(I.ea_pos)+')</small>':I.src==='FM'&&I.fm_pos?' <small class="mut">(FM '+E(I.fm_pos)+')</small>':'')+'</span>'+(I.nation?'<span>'+E(I.nation)+'</span>':'')+'</div>'

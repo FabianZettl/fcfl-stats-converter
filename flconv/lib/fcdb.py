@@ -1,8 +1,10 @@
 """EA FC player database (CSV export, e.g. fc27-players-2026-10-11.csv): load, find the player of the game in it (unambiguous only) and give the stats in the form
 of sofifa.convert (keys like 'crossing', 'attpos', 'defaw', ...), so the import of a player and of a whole team uses the same conversion and rules."""
 import csv
+import glob
 import os
 import re
+import time
 import unicodedata
 
 _STOP = {'fc', 'cf', 'afc', 'sc', 'ac', 'as', 'ssc', 'club', 'fk', 'bk', 'sk', 'if', 'sv', 'vfb', 'vfl', 'tsg', 'cd', 'ud', 'sd', 'rc', 'us', 'ff', 'de', 'del', 'la', 'le', 'the', '1', 'calcio',
@@ -45,29 +47,78 @@ def _year(v):
     return int(m.group(1)) if m else None
 
 
+def _date(v):
+    """'24-11-2026' or '2026-11-24' -> (2026, 11, 24), else None"""
+    m = re.match(r'\s*(\d{1,2})[-./](\d{1,2})[-./](\d{4})', str(v or ''))
+    if m:
+        return int(m.group(3)), int(m.group(2)), int(m.group(1))
+    m = re.match(r'\s*(\d{4})-(\d{2})-(\d{2})', str(v or ''))
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+
+
+def _read(path):
+    with open(path, encoding='utf-8-sig', newline='') as f:
+        return [r for r in csv.DictReader(f) if r.get('club_name') not in ('ICON', 'Hero') and r.get('rating')]   # special cards are no real squads
+
+
+def update_files(folder):
+    """The SoFIFA updates in a folder (every csv with the columns base_id and snapshot), oldest first: [dict(path, name, date)]. The date of an update is the newest snapshot in it, else a date in the
+    file name (fc27-players-2026-11-24.csv), else the day the file was changed."""
+    out = []
+    for path in sorted(glob.glob(os.path.join(folder or '', '*.csv'))):
+        try:
+            with open(path, encoding='utf-8-sig', newline='') as f:
+                rd = csv.DictReader(f)
+                if not rd.fieldnames or 'base_id' not in rd.fieldnames or 'rating' not in rd.fieldnames:
+                    continue
+                snap = max((d for d in (_date(r.get('snapshot')) for r in rd) if d), default=None)
+        except OSError:
+            continue
+        m = re.search(r'(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})', os.path.basename(path))
+        mt = time.localtime(os.path.getmtime(path))
+        fdate = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (mt.tm_year, mt.tm_mon, mt.tm_mday)
+        out.append(dict(path=path, name=os.path.basename(path), date=snap or fdate, mtime=os.path.getmtime(path)))
+    return sorted(out, key=lambda u: (u['date'], u['mtime']))
+
+
 class DB:
-    def __init__(self, path):
+    def __init__(self, path, updates=()):
+        """path: the standard database; updates: update_files(...) - a player of an update replaces the player of the same base_id when its snapshot (else the date of the file) is not older"""
         self.path = path
         self.rows = []
         self.by_full = {}
         self.by_last = {}
-        with open(path, encoding='utf-8-sig', newline='') as f:
-            for r in csv.DictReader(f):
-                if r.get('club_name') in ('ICON', 'Hero') or not r.get('rating'):
-                    continue   # special cards, not real squads
-                first, last = fold(r.get('first_name')), fold(r.get('last_name'))
-                row = dict(id=r['stats_id'] or r['base_id'], name='%s %s' % (r.get('first_name', ''), r.get('last_name', '')) if not r.get('common_name') else r['common_name'],
-                           full=(first + ' ' + last).strip(), first=first, last=last, club=r.get('club_name', ''), ck=club_key(r.get('club_name')), nation=r.get('nation_name', ''),
-                           pos=r.get('position', ''), alt=[r.get(k, '') for k in ('position_alt', 'position_alt_2', 'position_alt_3') if r.get(k)], rating=_int(r.get('rating')),
-                           potential=_int(r.get('potential')), height=_int(r.get('height')), byear=_year(r.get('birthdate')), raw=r)
-                self.rows.append(row)
-                for k in {row['full'], fold(r.get('common_name')), fold(r.get('full_name'))}:
-                    if k:
-                        self.by_full.setdefault(k, []).append(row)
-                lt = last.split()
-                for i in range(len(lt)):   # indexed under every part of the surname: 'strand larsen', 'larsen' and 'strand' (Grimaldo in Grimaldo Garcia)
-                    for j in range(i + 1, len(lt) + 1):
-                        self.by_last.setdefault(' '.join(lt[i:j]), []).append(row)
+        self.updates = []   # [dict(name, date, rows, used)]
+        base = _read(path)
+        cur = {}   # base_id -> (date, row dict, label)
+        for r in base:
+            cur[r.get('base_id') or r['stats_id']] = (_date(r.get('snapshot')) or (), r, 'standard')
+        for u in updates:
+            n = used = 0
+            for r in _read(u['path']):
+                n += 1
+                k, d = r.get('base_id') or r.get('stats_id'), _date(r.get('snapshot')) or u['date']
+                if k not in cur or d >= (cur[k][0] or ()):
+                    cur[k] = (d, r, u['name'])
+            self.updates.append(dict(name=u['name'], date=u['date'], rows=n))
+        for lab in {v[2] for v in cur.values()}:
+            for u in self.updates:
+                if u['name'] == lab:
+                    u['used'] = sum(1 for v in cur.values() if v[2] == lab)
+        for d, r, lab in cur.values():
+            first, last = fold(r.get('first_name')), fold(r.get('last_name'))
+            row = dict(id=r['stats_id'] or r['base_id'], name='%s %s' % (r.get('first_name', ''), r.get('last_name', '')) if not r.get('common_name') else r['common_name'],
+                       full=(first + ' ' + last).strip(), first=first, last=last, club=r.get('club_name', ''), ck=club_key(r.get('club_name')), nation=r.get('nation_name', ''),
+                       pos=r.get('position', ''), alt=[r.get(k, '') for k in ('position_alt', 'position_alt_2', 'position_alt_3') if r.get(k)], rating=_int(r.get('rating')),
+                       potential=_int(r.get('potential')), height=_int(r.get('height')), byear=_year(r.get('birthdate')), raw=r, upd=None if lab == 'standard' else lab, upd_date=d)
+            self.rows.append(row)
+            for k in {row['full'], fold(r.get('common_name')), fold(r.get('full_name'))}:
+                if k:
+                    self.by_full.setdefault(k, []).append(row)
+            lt = last.split()
+            for i in range(len(lt)):   # indexed under every part of the surname: 'strand larsen', 'larsen' and 'strand' (Grimaldo in Grimaldo Garcia)
+                for j in range(i + 1, len(lt) + 1):
+                    self.by_last.setdefault(' '.join(lt[i:j]), []).append(row)
 
     def stats(self, row, gk=False):
         """-> dict in the form of sofifa.parse_page + overall/potential. Keepers have no field attributes in the export: they get a low value."""
@@ -163,9 +214,11 @@ class DB:
 _CACHE = {}
 
 
-def load(path):
-    mt = os.path.getmtime(path)
+def load(path, folder=None):
+    """the standard database plus the updates in `folder` (see update_files); worked out again when a file changes"""
+    ups = update_files(folder) if folder else []
+    key = (os.path.getmtime(path), tuple((u['path'], u['mtime']) for u in ups))
     c = _CACHE.get(path)
-    if not c or c[0] != mt:
-        _CACHE[path] = (mt, DB(path))
+    if not c or c[0] != key:
+        _CACHE[path] = (key, DB(path, ups))
     return _CACHE[path][1]

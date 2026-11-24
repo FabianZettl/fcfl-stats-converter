@@ -54,6 +54,10 @@ The tool opens `http://127.0.0.1:8790/` in your browser (it only listens on your
 Settings, backups and the copy of your original `Player.bin` are kept in `~/.local/share/fl-stats-converter` (Linux) or
 `%APPDATA%\FL-Stats-Converter` (Windows); `--data-dir` changes that.
 
+## SoFIFA updates (new player values, loaded live)
+
+SoFIFA sends CSV files with updated player values (the same columns as `fc27-players.csv`). **Tools > SoFIFA update** loads one or several of them, or you copy them into the folder `ea-updates` of the data folder; the tool picks them up within 10 seconds, no restart. For every player the **newest row** counts: a row with a newer snapshot (the `snapshot` column; else the date in the file name, else the day the file was changed) replaces an older update and the standard database, an older row never replaces a newer one, players that the standard database does not have are added. Eight updates in any order are fine. The start page lists every update with its date and how many players it supplies; the player page says "EA FC rating (SoFIFA update 24.11.2026)", and a player whose values changed shows *convert again*.
+
 ## FM list (FMInside export) as fallback and filler
 
 The converter ships a list exported from FMInside (`flconv/data/fmdb/`, CSV, `;`, first column `UID`, one row per player, about 10,000 players of which about 6,000 with all values). Your own, newer lists go into the folder `fmdb` of the data folder (`~/.local/share/fl-stats-converter/fmdb/` on Linux; several files are fine, your files win over the shipped one by UID). The converter uses them like this:

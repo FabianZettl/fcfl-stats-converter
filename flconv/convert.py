@@ -182,7 +182,7 @@ def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_cali
         src_ovr = row['rating']
         d['source'] = 'EA FC'
         d['src_ovr'] = src_ovr
-        d['db'] = dict(id=row['id'], name=row['name'], club=row['club'], rating=row['rating'], pos=row['pos'], nation=row['nation'])
+        d['db'] = dict(id=row['id'], name=row['name'], club=row['club'], rating=row['rating'], pos=row['pos'], nation=row['nation'], upd=row.get('upd'), upd_date=row.get('upd_date'))
     else:
         return dict(ok=False, msg='No source.')
     ex = (sofifa.explain_gk(xraw) if gk else sofifa.explain(xraw)) if xraw is not None else {}

@@ -48,6 +48,10 @@ Alles Weitere (Zuordnung der Spieler, Umrechnung, Jugendbonus, Entwicklung, Sich
 die Änderungen gegenüber dem PES Stats Converter in [CHANGES.md](CHANGES.md), die Datenquellen in [DATA.md](DATA.md).
 Die Umrechnung geht immer von den **Originalwerten** aus (beim ersten Benutzen einer Datenbank wird eine Kopie angelegt): zweimal ausführen gibt dasselbe Ergebnis.
 
+## SoFIFA-Updates (neue Spielerwerte, live geladen)
+
+SoFIFA schickt CSV-Dateien mit aktualisierten Spielerwerten (dieselben Spalten wie `fc27-players.csv`). **Tools > SoFIFA update** lädt eine oder mehrere, oder du kopierst sie in den Ordner `ea-updates` im Datenordner; das Tool nimmt sie innerhalb von 10 Sekunden auf, ohne Neustart. Für jeden Spieler zählt die **neueste Zeile**: Eine Zeile mit neuerem Snapshot (Spalte `snapshot`, sonst das Datum im Dateinamen, sonst der Tag der Änderung) ersetzt ein älteres Update und die Standarddatenbank, eine ältere Zeile ersetzt nie eine neuere, Spieler, die die Standarddatenbank nicht hat, kommen dazu. Acht Updates in beliebiger Reihenfolge gehen. Die Startseite listet jedes Update mit Datum und Zahl der Spieler, die Spielerseite sagt "EA FC rating (SoFIFA update 24.11.2026)", und ein Spieler mit geänderten Werten zeigt *convert again*.
+
 ## FM-Liste (FMInside-Export) als Fallback und Lückenfüller
 
 Der Converter bringt eine Liste aus FMInside mit (`flconv/data/fmdb/`, CSV, `;`, erste Spalte `UID`, eine Zeile je Spieler, etwa 10.000 Spieler, davon etwa 6.000 mit allen Werten). Eigene, neuere Listen kommen in den Ordner `fmdb` im Datenordner (`~/.local/share/fl-stats-converter/fmdb/` unter Linux; mehrere Dateien sind möglich, deine gewinnen je UID gegen die mitgelieferte). Der Converter nutzt sie so:

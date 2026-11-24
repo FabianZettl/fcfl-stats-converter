@@ -352,11 +352,13 @@ def load():
     CFG['journal'] = journal_path()
     if not CFG['pesdb']:
         M = None
-        EA = EA or fcdb.load(CFG['csv'])
+        EA = EA or fcdb.load(CFG['csv'], ea_updates_dir())
         return
     plan = CFG['plan'] or os.path.join(CFG['pesdb'], '..', '..', '..', 'leaguebuilder-plan.json')   # names of the leagues, when the database comes with them
     M = dbmeta.Meta(CFG['pesdb'], os.path.join(DATA, 'original-' + db_key()), plan)
-    EA = fcdb.load(CFG['csv'])
+    EA = fcdb.load(CFG['csv'], ea_updates_dir())
+    EAR.update(t=time.time(), sig=None)
+    ea_refresh_force()
     MATCH.clear()
     ASSIGN.clear()
     ASSIGN.update(assign_load())
@@ -554,7 +556,54 @@ def assign_set(pid, db_id):
     MATCH.pop(pid, None)
 
 
+def ea_update_add(name, text):
+    """a SoFIFA update (CSV like the EA FC export, columns base_id and rating) loaded on the start page: kept in the folder ea-updates and used at once"""
+    name = re.sub(r'[^A-Za-z0-9._-]', '_', os.path.basename(str(name or 'update.csv')))
+    name = name if name.lower().endswith('.csv') else name + '.csv'
+    cols = [c.strip() for c in str(text or '').lstrip('\ufeff').split('\n', 1)[0].split(',')]
+    if 'base_id' not in cols or 'rating' not in cols:
+        return dict(ok=False, msg='This is not a SoFIFA / EA FC player export (the columns base_id and rating are missing).')
+    d = ea_updates_dir()
+    os.makedirs(d, exist_ok=True)
+    tmp = os.path.join(d, name + '.tmp')
+    open(tmp, 'w', encoding='utf-8', newline='').write(str(text).lstrip('\ufeff'))
+    os.replace(tmp, os.path.join(d, name))
+    ea_refresh_force()
+    u = next((x for x in EA.updates if x['name'] == name), None)
+    if u is None:
+        return dict(ok=False, msg='The file could not be read as an update.')
+    return dict(ok=True, name=name, date='%02d.%02d.%d' % (u['date'][2], u['date'][1], u['date'][0]), rows=u['rows'], used=u.get('used', 0))
+
+
+EAR = dict(t=0, sig=None)
+
+
+def ea_updates_dir():
+    return os.path.join(DATA, 'ea-updates')
+
+
+def ea_refresh_force():
+    EAR['t'] = 0
+    ea_refresh()
+
+
+def ea_refresh():
+    """a SoFIFA update that was put into the folder ea-updates (or loaded on the start page) is used at once: looked at every 10 seconds, the EA FC database is worked out again when a file
+    changed and the matches are forgotten"""
+    global EA
+    if EA is None or time.time() - EAR['t'] < 10:
+        return
+    EAR['t'] = time.time()
+    d = ea_updates_dir()
+    sig = [(f, os.path.getmtime(os.path.join(d, f))) for f in sorted(os.listdir(d)) if f.endswith('.csv')] if os.path.isdir(d) else []
+    if sig != EAR['sig']:
+        EAR['sig'] = sig
+        EA = fcdb.load(CFG['csv'], d)
+        MATCH.clear()
+
+
 def match(pid):
+    ea_refresh()
     m = MATCH.get(pid)
     if m is None and str(pid) in ASSIGN:
         m = EA.match('', None, db_id=ASSIGN[str(pid)])
@@ -614,6 +663,8 @@ def sig_of(pid, src, youth):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
+    if src == 'EA FC' and m['status'] == 'ok' and m['row'].get('upd'):   # the values come from a SoFIFA update: new values convert the player again (rows of the standard database keep their signature)
+        sid += '|' + hashlib.md5(repr(sorted(m['row']['raw'].items())).encode()).hexdigest()[:10]
     if src == 'FM list':   # the row of the list and its values: a new export of the list converts the player again
         fr = fm_row(pid)
         sid = 'FM%s|%s' % (fr['UID'], sorted(fmdb.raw(fr).items())) if fr else src
@@ -1907,7 +1958,7 @@ class H(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b)
             elif u.path == '/api/init':
-                self.send_json(dict(ok=True, pesdb=CFG['pesdb'], loaded=M is not None, players=M.pb.n if M else 0, ea=len(EA.rows), csv=os.path.basename(CFG['csv']), fm=len(fm_list()), fm_values=sum(1 for r in fm_list().rows.values() if fmdb.complete(r)),
+                self.send_json(dict(ok=True, pesdb=CFG['pesdb'], loaded=M is not None, players=M.pb.n if M else 0, ea=len(EA.rows), csv=os.path.basename(CFG['csv']), ea_updates=[dict(name=u['name'], date='%02d.%02d.%d' % (u['date'][2], u['date'][1], u['date'][0]), rows=u['rows'], used=u.get('used', 0)) for u in EA.updates], fm=len(fm_list()), fm_values=sum(1 for r in fm_list().rows.values() if fmdb.complete(r)),
                                     leagues=[dict(id=c, name=L['name'], n=len(L['teams'])) for c, L in sorted(M.leagues.items(), key=lambda kv: kv[1]['name'])] if M else [], backups=backups()))
             elif u.path == '/api/fs':
                 self.send_json(fs_list((q.get('path') or [''])[0], (q.get('kind') or [''])[0]))
@@ -2001,6 +2052,8 @@ class H(BaseHTTPRequestHandler):
             elif self.path == '/api/restart':
                 self.send_json(dict(ok=True))
                 threading.Timer(0.5, restart).start()
+            elif self.path == '/api/eaupdate':
+                self.send_json(ea_update_add(body.get('name'), body.get('text')))
             elif self.path == '/api/livepatch':
                 if body.get('action') == 'install':
                     self.send_json(lp_install())
