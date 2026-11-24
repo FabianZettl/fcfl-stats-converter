@@ -404,7 +404,7 @@ FML = dict(l=None, t=0)
 def fm_list():
     """the FM lists (folders <data dir>/fmdb and flconv/data/fmdb), looked at again every 10 seconds so that a new file is found without a restart"""
     if FML['l'] is None or time.time() - FML['t'] > 10:
-        folders = [os.path.join(DATA, 'fmdb'), os.path.join(HERE, 'data', 'fmdb')]
+        folders = [os.path.join(HERE, 'data', 'fmdb'), os.path.join(DATA, 'fmdb')]   # the shipped list first: your own newer files win by UID
         sig = [(f, os.path.getmtime(f), len(os.listdir(f))) for f in folders if os.path.isdir(f)]
         if FML['l'] is None or FML.get('sig') != sig:
             FML.update(l=fmdb.FMList(folders), sig=sig)

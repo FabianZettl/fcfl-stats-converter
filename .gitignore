@@ -4,5 +4,3 @@ build/
 dist/
 *.spec.bak
 
-# FM lists (scraped lists of FMInside): not part of the repository
-flconv/data/fmdb/

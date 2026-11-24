@@ -48,7 +48,7 @@ Die Umrechnung geht immer von den **Originalwerten** aus (beim ersten Benutzen e
 
 ## FM-Liste (FMInside-Export) als Fallback und Lückenfüller
 
-Listen aus FMInside (CSV, `;`, erste Spalte `UID`, eine Zeile je Spieler) kommen in den Ordner `fmdb` im Datenordner (`~/.local/share/fl-stats-converter/fmdb/` unter Linux; mehrere Dateien sind möglich, die spätere gewinnt je UID; die Listen gehören nicht in dieses Repository). Der Converter nutzt sie so:
+Der Converter bringt eine Liste aus FMInside mit (`flconv/data/fmdb/`, CSV, `;`, erste Spalte `UID`, eine Zeile je Spieler, etwa 10.000 Spieler, davon etwa 6.000 mit allen Werten). Eigene, neuere Listen kommen in den Ordner `fmdb` im Datenordner (`~/.local/share/fl-stats-converter/fmdb/` unter Linux; mehrere Dateien sind möglich, deine gewinnen je UID gegen die mitgelieferte). Der Converter nutzt sie so:
 
 * **Fallback-Quelle:** Ein Spieler, den EA FC / SoFIFA nicht hat (kein Treffer), wird aus der Liste umgerechnet, wie eine eingefügte FMInside-Seite (mit der Kalibrierung unten). Ein unsicherer EA-Treffer wird nicht ersetzt, den wählst du wie bisher.
 * **Positionen kommen zuerst aus FM:** Ein Spieler mit Positionsbewertungen in der Liste bekommt genau diese (*natural* = Stufe 2, *accomplished* = 1, alles andere 0; der Schattenstürmer hat keine FM-Bewertung und bleibt; seine Hauptposition bleibt auf Stufe 2). EA FC (Alternativpositionen) und das Wertemodell sind der Ersatz für Spieler ohne FM-Bewertung. Eine Zeile, die nicht zur Position des Spielers passt (ein Torwart mit dem Namen eines Stürmers), wird nicht benutzt. In der Spielerliste zeigt ein Chip *Found EAFC*, *Found FM* oder *Found EAFC & FM*.

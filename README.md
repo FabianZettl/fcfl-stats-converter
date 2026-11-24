@@ -54,7 +54,7 @@ Settings, backups and the copy of your original `Player.bin` are kept in `~/.loc
 
 ## FM list (FMInside export) as fallback and filler
 
-Put lists exported from FMInside (CSV, `;`, first column `UID`, one row per player) into the folder `fmdb` of the data folder (`~/.local/share/fl-stats-converter/fmdb/` on Linux; several files are fine, a later file wins by UID; the lists are not part of this repository). The converter then uses them like this:
+The converter ships a list exported from FMInside (`flconv/data/fmdb/`, CSV, `;`, first column `UID`, one row per player, about 10,000 players of which about 6,000 with all values). Your own, newer lists go into the folder `fmdb` of the data folder (`~/.local/share/fl-stats-converter/fmdb/` on Linux; several files are fine, your files win over the shipped one by UID). The converter uses them like this:
 
 * **Fallback source:** a player that EA FC / SoFIFA does not have (no match) is converted from the list, like a pasted FMInside page (with the calibration below). An uncertain EA match is not replaced, you choose it as before.
 * **Positions come from FM first:** a player with position ratings in the list gets exactly those (*natural* = level 2, *accomplished* = 1, everything else 0; the second striker has no FM rating and stays; his main position stays at level 2). EA FC (alternative positions) and the values model are the fallback for players without FM ratings. A row that does not fit the player's position (a keeper called like a striker) is not used. In the player list a chip says *Found EAFC*, *Found FM* or *Found EAFC & FM*.
