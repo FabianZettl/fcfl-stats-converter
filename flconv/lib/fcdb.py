@@ -237,6 +237,7 @@ class DB:
             for u in self.updates:
                 if u['name'] == lab:
                     u['used'] = sum(1 for v in cur.values() if v[2] == lab)
+        self.data_date = max([bdate] + [u['date'] for u in self.updates if u.get('used')])   # the date the values are as of: the standard database, or the newest update that brought something
         for d, r, lab in cur.values():
             first, last = fold(r.get('first_name')), fold(r.get('last_name'))
             row = dict(id=r['stats_id'] or r['base_id'], name='%s %s' % (r.get('first_name', ''), r.get('last_name', '')) if not r.get('common_name') else r['common_name'],

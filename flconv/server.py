@@ -318,28 +318,41 @@ def live_squads():
 
 def target_date():
     if SET['mode'] == 'ml':
-        return gaffer_date() or timeshift.BASE
+        return gaffer_date() or values_date()
     try:
         y, m, d = [int(x) for x in str(SET.get('date') or '').split('-')]
         return (y, m, d)
     except Exception:
-        return timeshift.BASE
+        return values_date()
 
 
+
+
+def values_date():
+    """the date the values are as of (the development to the write date counts from here): what the user typed in the settings, else the date of the standard database or of the newest update
+    that brought something (EA.data_date), else 01.09.2026"""
+    try:
+        y, m, d = [int(x) for x in str(SET.get('base_date') or '').split('-')]
+        return (y, m, d)
+    except Exception:
+        pass
+    dd = getattr(EA, 'data_date', None)
+    return tuple(dd) if dd and len(dd) == 3 and dd[0] else timeshift.BASE
 
 
 def months():
-    return round(max(-36.0, min(120.0, timeshift.months_between(timeshift.BASE, target_date()))), 2)
+    return round(max(-36.0, min(120.0, timeshift.months_between(values_date(), target_date()))), 2)
 
 
 def age_base(pid):
-    """age at 01.09.2026: from the date of birth of the EA FC entry when there is one, otherwise the age of the database"""
+    """age at the date of the values: from the date of birth of the EA FC entry when there is one, otherwise the age of the database"""
     m = MATCH.get(pid)
     r = m.get('row') if m and m.get('status') == 'ok' else None
     bd = str(r['raw'].get('birthdate') or '') if r else ''
     try:
         d, mo, y = [int(x) for x in bd.split('-')]
-        return (timeshift.BASE[0] - y) + (timeshift.BASE[1] - mo) / 12.0 + (timeshift.BASE[2] - d) / 365.0
+        vd = values_date()
+        return (vd[0] - y) + (vd[1] - mo) / 12.0 + (vd[2] - d) / 365.0
     except Exception:
         a = M.age.get(pid)
         return float(a) if a else None
@@ -1910,7 +1923,7 @@ def settings_view():
     gd = gaffer_date() if SET['mode'] == 'ml' else None
     return dict(ok=True, mode=SET['mode'], dbpath=SET.get('dbpath'), pesdb=r, db_ok=bool(r), loaded=M is not None, date=SET.get('date') or '', data_dir=DATA,
                 savedir=SET.get('savedir') or '', edit_manual=bool(SET.get('edit_manual')), live_data=bool(SET.get('live', True)), modules=modules_dir(), module=MOD['state'], bridge=br, bridge_ok=bool(br and os.path.isfile(os.path.join(br, 'growth.csv'))), gaffer_date=('%02d.%02d.%d' % gd[::-1]) if gd else None,
-                target='%02d.%02d.%d' % td[::-1], base='01.09.2026', months=months(), players=M.pb.n if M else 0, live=len(live_attrs()) if SET['mode'] == 'ml' else 0)
+                target='%02d.%02d.%d' % td[::-1], base='%02d.%02d.%d' % values_date()[::-1], base_date=SET.get('base_date') or '', base_iso='%d-%02d-%02d' % values_date(), months=months(), players=M.pb.n if M else 0, live=len(live_attrs()) if SET['mode'] == 'ml' else 0)
 
 
 def settings_set(body):
@@ -1939,6 +1952,11 @@ def settings_set(body):
             SET['edit_manual'] = bool(body['edit_manual'])
         if 'date' in body:
             SET['date'] = str(body['date'] or '')
+        if 'base_date' in body:   # '' = automatic (the date of the standard database / of the newest update)
+            v = str(body['base_date'] or '')
+            if v and not re.fullmatch(r'\d{4}-\d{2}-\d{2}', v):
+                return dict(ok=False, msg='The date has to look like 2026-11-24.')
+            SET['base_date'] = v
         if body.get('dbpath') and body['dbpath'] != SET.get('dbpath'):
             r = resolve_pesdb(body['dbpath'])
             if not r:
