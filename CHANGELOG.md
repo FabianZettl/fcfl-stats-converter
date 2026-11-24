@@ -2,7 +2,8 @@
 
 Releases of FCFL - Stats Converter, newest first. (`CHANGES.md` lists what is different from the PES Stats Converter this tool started from.)
 
-## v0.7.1 - (not released yet)
+## v0.7.1 - 2026-11-24
+* **New FM list**: 11,000 players, 8,500 with every attribute, all with position ratings. FM calibration from 6,000 players (held out: field players 5.7 -> 4.4, keepers 5.6 -> 1.7).
 * **Positions from FM, corrected**: the two middle FM ratings straddle the border between the levels of the game (checked on 6,600 players with the original levels: *accomplished* is level 0 / 1 / 2 in 15 / 41 / 44 %, *competent* 50 / 35 / 16 %). So the level the player has is kept inside the band that the rating allows: *natural* = 2, *accomplished* keeps 1-2, *competent* keeps up to 1 (never adds), everything else 0. Bruno Fernandes keeps CMF 2 (before: lowered to 1 and shown as lost) and loses only LMF and RMF.
 * The player page tells **lost** (cannot play there any more, red dashed) from **lowered** (still playable, one level lower, orange dotted, listed with the levels).
 * `tools/update_fm_list.py`: one command for a new FM list (copy, calibration with backup, hold-out report).
