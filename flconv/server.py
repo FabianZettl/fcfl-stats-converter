@@ -760,7 +760,7 @@ def positions_for(pid, final, row=None, paste=False, fmr=None):
     i = pb.index[pid]
     cur = pb.positions(i)
     if fmr is not None and fmdb.has_positions(fmr):
-        new = fmdb.positions(fmr)
+        new = fmdb.positions(fmr, cur)
         new[11] = cur[11]
         if pos_of(pid) < 13:
             new[pos_of(pid)] = max(new[pos_of(pid)], 2)
@@ -775,7 +775,8 @@ def positions_for(pid, final, row=None, paste=False, fmr=None):
         new = [max(a, b) for a, b in zip(cur, prop)]
     if new == cur:
         return None
-    return dict(cur=cur, new=new, add=[dbmeta.POS_NAMES[k] for k in range(13) if new[k] > cur[k]], rem=[dbmeta.POS_NAMES[k] for k in range(13) if new[k] < cur[k]])
+    return dict(cur=cur, new=new, add=[dbmeta.POS_NAMES[k] for k in range(13) if new[k] > cur[k]], rem=[dbmeta.POS_NAMES[k] for k in range(13) if new[k] == 0 < cur[k]],
+                down=['%s %d→%d' % (dbmeta.POS_NAMES[k], cur[k], new[k]) for k in range(13) if 0 < new[k] < cur[k]])   # rem: cannot play there any more; down: still can, one level lower
 
 
 def ea_names(row):

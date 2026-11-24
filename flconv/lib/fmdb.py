@@ -104,11 +104,19 @@ def detail(r):
     return has_positions(r) or bool(_int(r.get('Weak foot')))
 
 
-def positions(r):
-    """13 levels 0/1/2 from the position ratings (natural 2, accomplished 1)"""
+BAND = {'natural': (2, 2), 'accomplished': (1, 2), 'competent': (0, 1)}   # the levels of the game that a FM rating allows; checked on 6,600 players of the game (original levels): natural is 2 in 85 %,
+# accomplished 0 / 1 / 2 in 15 / 41 / 44 %, competent 50 / 35 / 16 %, unavailable is 0 in 94 %: the two middle ratings straddle the border, so the level the player has is kept inside the band
+
+
+def positions(r, cur=None):
+    """13 levels 0/1/2 from the position ratings. Without `cur`: natural 2, accomplished 1, the rest 0. With the levels the player has: natural 2; accomplished keeps what he has between 1 and 2;
+    competent keeps what he has up to 1 (never adds); everything else 0 (FM says he cannot play there)"""
     out = [0] * 13
     for col, k in POS_COLS:
-        out[k] = max(out[k], LEVEL.get((r.get(col) or '').strip().lower(), 0))
+        lab = (r.get(col) or '').strip().lower()
+        lo, hi = BAND.get(lab, (0, 0))
+        v = lo if cur is None else min(hi, max(lo, cur[k])) if lab != 'competent' else min(hi, cur[k])
+        out[k] = max(out[k], v)
     return out
 
 

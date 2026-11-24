@@ -50,4 +50,10 @@ assert not fmdb.has_positions(listrow) and not fmdb.detail(listrow) and fmdb.det
 assert fmdb.plausible(mb, 12) and fmdb.plausible(mb, 9) and fmdb.plausible(mb, 8)   # AML, ST: a striker, a left winger, an attacking midfielder fit
 assert not fmdb.plausible(mb, 0) and not fmdb.plausible(mb, 1) and not fmdb.plausible(dict(mb, Positions='GK'), 12) and fmdb.plausible(dict(mb, Positions='GK'), 0)
 assert fmdb.plausible(dict(mb, Positions=''), 1)   # nothing to judge by
+bruno = dict(mb, **{'Pos AMC': 'natural', 'Pos MC': 'accomplished', 'Pos ST': 'competent', 'Pos ML': 'unavailable', 'Pos AML': 'competent', 'Pos ST': 'competent', 'Pos DM': 'competent'})
+cur = [0, 0, 0, 0, 0, 2, 2, 1, 2, 1, 1, 1, 0]   # CMF 2, LMF 2, RMF 1, AMF 2, LWF 1, RWF 1, SS 1
+lv = fmdb.positions(bruno, cur)
+assert lv[5] == 2 and lv[8] == 2          # accomplished keeps his CMF 2, natural AMF 2
+assert lv[6] == 0 and lv[9] == 1 and lv[4] == 0   # ML unavailable: lost; AML competent keeps 1; DM competent never adds
+assert fmdb.positions(bruno)[5] == 1 and fmdb.positions(bruno, [0] * 13)[5] == 1 and fmdb.positions(bruno, [0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0])[9] == 1   # without levels: accomplished 1; competent 2 -> 1
 print('ok')
