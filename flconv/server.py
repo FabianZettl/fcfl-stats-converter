@@ -882,7 +882,7 @@ def preview(body):
     row = None if fm else row_for(pid, body.get('db_id'))
     fmr = fm_row(pid)
     from_list = False
-    if not fm and row is None and fmr is not None and match(pid)['status'] == 'none':   # no EA FC / SoFIFA data (an uncertain match is not 'none': the user chooses): the FM list is the fallback, converted like a pasted FMInside page
+    if not fm and row is None and fmr is not None and fmdb.complete(fmr) and match(pid)['status'] == 'none':   # no EA FC / SoFIFA data (an uncertain match is not 'none': the user chooses): the FM list is the fallback, converted like a pasted FMInside page
         fm, from_list = fmdb.page_text(fmr), True
     if not fm and row is None:
         m = match(pid)
@@ -1376,7 +1376,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                 cnt['already'] += 1
                 continue
             m = match(pid)
-            if m['status'] == 'ok' or (m['status'] == 'none' and fm_row(pid) is not None):   # EA FC, else the FM list (preview takes it as the fallback)
+            if m['status'] == 'ok' or (m['status'] == 'none' and fm_row(pid) is not None and fmdb.complete(fm_row(pid))):   # EA FC, else the FM list (preview takes it as the fallback)
                 p = preview(dict(pid=pid, youth=youth, skills=skills, psboost=psboost))
                 if not p.get('ok'):
                     cnt['failed'] += 1

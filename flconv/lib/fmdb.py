@@ -74,6 +74,11 @@ def page_text(r):
     return '\n' + '\n'.join(ls) + '\n'
 
 
+def complete(r):
+    """the row has every attribute the FM conversion needs (a list that only has names, club, ability and age is no source of values; keepers need the keeper attributes)"""
+    return not sofifa.missing_fm(raw(r), (r.get('Positions') or '').strip().startswith('GK'))
+
+
 def positions(r):
     """13 levels 0/1/2 from the position ratings (natural 2, accomplished 1)"""
     out = [0] * 13

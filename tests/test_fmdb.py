@@ -42,4 +42,6 @@ lv = fmdb.positions(mb)
 assert lv[12] == 2 and lv[8] == 1 and lv[9] == 2 and lv[1] == 0 and lv[2] == 0   # ST natural, AMC accomplished, AML natural; competent / unavailable give nothing
 assert fmdb.weak_foot(mb) == (3, 3) and fmdb.weak_foot(dict(mb, **{'Weak foot': ''})) is None
 assert fmdb.foot(mb) == 'Right' and fmdb.foot(dict(mb, Footedness='Either')) is None and fmdb.height(mb) == 178 and fmdb.height(dict(mb, Height='99 CM')) is None
+assert fmdb.complete(mb) and not fmdb.complete(dict(mb, Pace=''))   # a row without all attributes is no source of values
+assert not fmdb.complete(dict(UID='9', Name='X', Positions='ST', **{'Ability (0-99)': '80'}))
 print('ok')
