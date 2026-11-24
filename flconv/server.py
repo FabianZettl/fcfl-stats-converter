@@ -353,10 +353,14 @@ def load():
     CFG['journal'] = journal_path()
     if not CFG['pesdb']:
         M = None
+        if not CFG.get('csv_fixed'):
+            CFG['csv'] = base_csv()
         EA = EA or fcdb.load(CFG['csv'], ea_updates_dir())
         return
     plan = CFG['plan'] or os.path.join(CFG['pesdb'], '..', '..', '..', 'leaguebuilder-plan.json')   # names of the leagues, when the database comes with them
     M = dbmeta.Meta(CFG['pesdb'], os.path.join(DATA, 'original-' + db_key()), plan)
+    if not CFG.get('csv_fixed'):
+        CFG['csv'] = base_csv()
     EA = fcdb.load(CFG['csv'], ea_updates_dir())
     EAR.update(t=time.time(), sig=None)
     ea_refresh_force()
@@ -580,6 +584,24 @@ def ea_update_add(name, text):
     return dict(ok=True, name=name, date='%02d.%02d.%d' % (u['date'][2], u['date'][1], u['date'][0]), rows=u['rows'], used=u.get('used', 0))
 
 
+def base_csv():
+    """the standard database of EA FC values: the newest export in the folder ea-base of the data folder (the German SoFIFA export with contracts, values and growth profiles, or the EA FC export;
+    newest by the date in the file name, else by the day of the file), else the one that comes with the tool"""
+    d = os.path.join(DATA, 'ea-base')
+    found = []
+    for f in sorted(glob.glob(os.path.join(d, '*.csv'))):
+        try:
+            if fcdb._sniff_kind(f):
+                m = re.search(r'(?<!\d)(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})(?!\d)', os.path.basename(f))
+                found.append(((int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (0, 0, 0), os.path.getmtime(f), f))
+        except (OSError, csv.Error, UnicodeDecodeError):
+            continue
+    if found:
+        return max(found)[2]
+    shipped = os.path.join(HERE, 'data', 'sofifa-base.csv')
+    return shipped if os.path.isfile(shipped) else os.path.join(HERE, 'data', 'fc27-players.csv')
+
+
 EAR = dict(t=0, sig=None)
 
 
@@ -600,7 +622,9 @@ def ea_refresh():
         return
     EAR['t'] = time.time()
     d = ea_updates_dir()
-    sig = [(f, os.path.getmtime(os.path.join(d, f))) for f in sorted(os.listdir(d)) if f.endswith('.csv')] if os.path.isdir(d) else []
+    if not CFG.get('csv_fixed'):   # a new base export put into ea-base is used at once
+        CFG['csv'] = base_csv()
+    sig = [(CFG['csv'], os.path.getmtime(CFG['csv']))] + [(f, os.path.getmtime(os.path.join(d, f))) for f in sorted(os.listdir(d)) if f.endswith('.csv')] if os.path.isdir(d) else [(CFG['csv'], os.path.getmtime(CFG['csv']))]
     if sig != EAR['sig']:
         EAR['sig'] = sig
         EA = fcdb.load(CFG['csv'], d)
@@ -987,9 +1011,12 @@ def candidates(pid, q=None):
 YOUTH = {16: 1.0, 17: 1.0, 18: 1.0, 19: 0.85, 20: 0.65, 21: 0.45, 22: 0.25}
 
 
-def youth_bonus(pid, rating, pot=None):
+GROWTH = {'Explosive Start': 1.3, 'Meteoric Peak': 1.15, 'Late Bloomer': 0.7}   # growth profile of EA FC -> factor of the youth bonus (our assumption: an explosive start grows faster now, a late bloomer later; the rest 1.0)
+
+
+def youth_bonus(pid, rating, pot=None, growth=None):
     """Small raise of the overall for young players whose potential is far above the rating (gap from 6 points, +3 at 14), weighted by age (16-18 full, 22 a quarter, from 23 none).
-    The potential comes from the EA FC entry (if the export has the column) or from a SoFIFA page; without a potential there is no bonus."""
+    The potential comes from the EA FC entry (if the export has the column) or from a SoFIFA page; without a potential there is no bonus. The growth profile (SoFIFA / EA FC) scales it (GROWTH)."""
     age = M.age.get(pid)
     f = YOUTH.get(age, 0.0 if age and age > 22 else (1.0 if age else 0.0))
     if not rating:
@@ -1001,7 +1028,7 @@ def youth_bonus(pid, rating, pot=None):
         if not gp:
             return 0
         gap = gp - 4 - rating
-    return int(round(min(3.0, max(0.0, (gap - 5) / 3.0)) * f))   # only a clearly large gap counts: from 6 points, +3 at 14
+    return int(round(min(3.0, max(0.0, (gap - 5) / 3.0)) * f * GROWTH.get(growth, 1.0)))   # only a clearly large gap counts: from 6 points, +3 at 14; the growth profile makes it more or less
 
 
 def row_for(pid, db_id=None):
@@ -1033,7 +1060,7 @@ def preview(body):
     target = body.get('target')
     yb = 0
     if target is None and row is not None and body.get('youth', True):
-        yb = youth_bonus(pid, row['rating'], row.get('potential'))
+        yb = youth_bonus(pid, row['rating'], row.get('potential'), row['raw'].get('growth_profile'))
         target = row['rating'] + yb if yb else None
     if target is None and fm and not convert.sofifa.is_fm(fm):   # SoFIFA page: its overall (and potential) are the target
         pg = convert.sofifa.parse_page(fm)
@@ -1086,7 +1113,9 @@ def preview(body):
         p['info'] = dict(full=('%s %s' % (raw.get('first_name', ''), raw.get('last_name', ''))).strip() if raw else '', nation=raw.get('nation_name') or '', club_ea=raw.get('club_name') or '',
                          birthdate=raw.get('birthdate') or '', height=M.pb.height(i), weight=M.pb.weight(i), foot=M.pb.foot(i), ea_foot=raw.get('foot') or '', weak_foot=raw.get('weak_foot') or '',
                          skill_moves=raw.get('skill_moves') or '', rating=(row or {}).get('rating') if row and not fm else None, potential=(row or {}).get('potential') if row and not fm else None,
-                         ea_pos=raw.get('position') or '', age=M.age.get(pid))
+                         ea_pos=raw.get('position') or '', age=M.age.get(pid), growth=raw.get('growth_profile') or '', emotion=raw.get('emotion') or '', accel=raw.get('acceleration_type') or '',
+                         contract=raw.get('contract') or '', loan_from=raw.get('loan_from') or '', loan_end=raw.get('loan_end') or '', value=raw.get('value') or '', wage=raw.get('wage') or '',
+                         clause=raw.get('release_clause') or '', work=' / '.join(x for x in (raw.get('work_rate_att'), raw.get('work_rate_def')) if x), yb_growth=GROWTH.get(raw.get('growth_profile'), 1.0) if raw else 1.0)
         if fmr is not None:   # FM: the source of this player (nothing from EA FC), or the extras next to EA FC
             fi = fm_info(fmr)
             if row and not fm:
@@ -2103,7 +2132,7 @@ def main():
         CFG.update(fmcal=os.path.join(DATA, 'fm_calib.json'), backups=os.path.join(DATA, 'backups'))
         SET_FILE = os.path.join(DATA, 'settings.json')
     if a.csv:
-        CFG['csv'] = a.csv
+        CFG['csv'], CFG['csv_fixed'] = a.csv, True
     if a.gaffer:
         CFG['gaffer'] = a.gaffer
     os.makedirs(DATA, exist_ok=True)

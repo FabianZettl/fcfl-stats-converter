@@ -68,7 +68,41 @@ _DE_COLS = {'Flanken': 'crossing', 'Abschluss': 'finishing', 'Kopfball-Präzisio
             'Fernschüsse': 'long_shots', 'Aggressivität': 'aggression', 'Abfangen': 'interceptions', 'Stellungssp.': 'positioning', 'Übersicht': 'vision', 'Elfmeter': 'penalties',
             'Ruhe': 'composure', 'Defensives Bewusstsein': 'def_awareness', 'Faire Zweikämpfe': 'standing_tackle', 'Grätsche': 'sliding_tackle', 'TH Flugparaden': 'gk_diving',
             'TH Fangsicherheit': 'gk_handling', 'TH Abschlag': 'gk_kicking', 'TH Stellungsspiel': 'gk_positioning', 'TH Reflexe': 'gk_reflexes'}
-_DE_POS = {'TW': 'GK', 'IV': 'CB', 'LV': 'LB', 'RV': 'RB', 'LAV': 'LWB', 'RAV': 'RWB', 'ZDM': 'CDM', 'ZM': 'CM', 'ZOM': 'CAM', 'LM': 'LM', 'RM': 'RM', 'LF': 'LW', 'RF': 'RW', 'ST': 'ST', 'MS': 'CF'}
+_DE_POS = {'TW': 'GK', 'IV': 'CB', 'LIV': 'CB', 'RIV': 'CB', 'LV': 'LB', 'RV': 'RB', 'LAV': 'LWB', 'RAV': 'RWB', 'ZDM': 'CDM', 'ZM': 'CM', 'ZOM': 'CAM', 'LM': 'LM', 'RM': 'RM', 'LF': 'LW', 'RF': 'RW',
+           'LA': 'LW', 'RA': 'RW', 'ST': 'ST', 'LS': 'ST', 'RS': 'ST', 'MS': 'CF'}   # EA FC 27 table (German -> English abbreviations)
+_DE_ACCEL = {'Explosiv': 'Explosive', 'Explosiv (überwie.)': 'Mostly Explosive', 'Explosiv (kontr.)': 'Controlled Explosive', 'Kontrolliert': 'Controlled', 'Anhaltend (kontr.)': 'Controlled Lengthy',
+             'Anhaltend (überwie.)': 'Mostly Lengthy', 'Anhaltend': 'Lengthy'}
+_DE_WORK = {'Hoch': 'High', 'Mittel': 'Medium', 'Niedrig': 'Low'}
+PS_UNKNOWN = {}   # German names in the PlayStyle columns that playstyles_de.json does not know: name -> number of players (so that they can be asked for, never guessed)
+_PS = {}
+
+
+def _ps_map():
+    if not _PS:
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'playstyles_de.json'), encoding='utf-8') as f:
+                _PS.update(__import__('json').load(f)['map'])
+        except (OSError, ValueError, KeyError):
+            _PS['_'] = ''
+    return _PS
+
+
+def _playstyles(normal, plus):
+    """'Spielstile' and 'Spielstile+' of the German export -> the form of the EA FC export ('Rapid|Quick Step+'); names that are not known go to PS_UNKNOWN and are left out"""
+    got = {}
+    for col, is_plus in ((normal, False), (plus, True)):
+        for t in str(col or '').split(','):
+            t = t.strip()
+            if not t or t == 'N/A':
+                continue
+            pl = is_plus or t.endswith('+')
+            name = re.sub(r'\s*\+$', '', t)
+            en = _ps_map().get(name)
+            if en is None:
+                PS_UNKNOWN[name] = PS_UNKNOWN.get(name, 0) + 1
+                continue
+            got[en] = got.get(en, False) or pl
+    return '|'.join(k + ('+' if v else '') for k, v in got.items())
 _COUNTRIES = {}
 
 
@@ -88,6 +122,12 @@ def _sniff(path):
         head = f.readline()
     d = ';' if head.count(';') > head.count(',') else ','
     return d, next(csv.reader([head], delimiter=d), [])
+
+
+def _sniff_kind(path):
+    """'ea' (EA FC export), 'de' (German SoFIFA export) or None"""
+    _, cols = _sniff(path)
+    return 'ea' if 'base_id' in cols and 'rating' in cols else 'de' if 'ID' in cols and 'Gesamtbewertung' in cols else None
 
 
 def read_update(path):
@@ -117,11 +157,22 @@ def read_update(path):
                  nation_name=_country((r.get('Nationalität') or '').strip()), club_name=(r.get('Verein') or '').strip(), position=pos[0] if pos else '',
                  position_alt=pos[1] if len(pos) > 1 else '', position_alt_2=pos[2] if len(pos) > 2 else '', position_alt_3=pos[3] if len(pos) > 3 else '',
                  rating=str(_int(r['Gesamtbewertung'])), potential=str(_int(r.get('Potenzial')) or ''), height=h.group(1) if h else '', weight=w.group(1) if w else '',
-                 foot={'Rechts': 'Right', 'Links': 'Left'}.get((r.get('foot') or '').strip(), ''), weak_foot=str(_int(r.get('Schwacher Fuß')) or ''), skill_moves=str(_int(r.get('Spezialbewegungen')) or ''),
+                 foot={'Rechts': 'Right', 'Links': 'Left'}.get((r.get('foot') or r.get('Starker Fuß') or '').strip(), ''), weak_foot=str(_int(r.get('Schwacher Fuß')) or ''), skill_moves=str(_int(r.get('Spezialbewegungen')) or ''),
                  birthdate='01-01-%s' % r['Geburtsjahr'].strip() if (r.get('Geburtsjahr') or '').strip().isdigit() else '', snapshot=snap)
         for de, en in _DE_COLS.items():
             if _int(r.get(de)) is not None:
                 n[en] = str(_int(r[de]))
+        ps = _playstyles(r.get('Spielstile'), r.get('Spielstile+'))
+        if ps or 'Spielstile' in r:
+            n['playstyles'] = ps   # a player of the export without PlayStyles has none (an empty value would not replace the old ones in an update: see DB)
+        ct = (r.get('Vertrag') or '').strip()
+        lf = re.match(r'\d{2}\.\d{2}\.\d{4}\s+(.+)$', ct)   # a loan: '31.12.2026 River Plate' = until, and the club he belongs to
+        n.update(contract=ct if ct != 'N/A' else '', loan_from=lf.group(1) if lf else '', loan_end=(r.get('Leihende') or '').strip().replace('N/A', ''), joined=(r.get('Beigetreten am') or '').strip().replace('N/A', ''),
+                 value=(r.get('Wert') or '').strip().replace('N/A', ''), wage=(r.get('Lohn') or '').strip().replace('N/A', ''), release_clause=(r.get('Freigabeklausel') or '').strip().replace('N/A', ''),
+                 acceleration_type=_DE_ACCEL.get((r.get('Antritts-Typ') or '').strip(), ''), growth_profile=(r.get('Growth profile') or '').strip().replace('N/A', ''),
+                 emotion='' if (r.get('Emotion') or '').strip() in ('N/A', 'PLAYER_EMOTION_0') else (r.get('Emotion') or '').strip(),
+                 work_rate_att=_DE_WORK.get((r.get('Offensiv-Arbeitsrate') or '').strip(), ''), work_rate_def=_DE_WORK.get((r.get('Defensiv-Arbeitsrate') or '').strip(), ''),
+                 international_reputation=str(_int(r.get('Internationale Reputation')) or ''), shirt_number=str(_int(r.get('Club kit number')) or ''))
         out.append(n)
     return out
 
@@ -149,11 +200,12 @@ class DB:
     def __init__(self, path, updates=()):
         """path: the standard database; updates: update_files(...) - a player of an update replaces the player of the same base_id when its snapshot (else the date of the file) is not older"""
         self.path = path
+        PS_UNKNOWN.clear()   # counted again while this database is read
         self.rows = []
         self.by_full = {}
         self.by_last = {}
         self.updates = []   # [dict(name, date, rows, used)]
-        base = _read(path)
+        base = read_update(path) if _sniff_kind(path) == 'de' else _read(path)
         cur = {}   # base_id -> (date, row dict, label)
         for r in base:
             cur[r.get('base_id') or r['stats_id']] = (_date(r.get('snapshot')) or (), r, 'standard')

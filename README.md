@@ -54,6 +54,15 @@ The tool opens `http://127.0.0.1:8790/` in your browser (it only listens on your
 Settings, backups and the copy of your original `Player.bin` are kept in `~/.local/share/fl-stats-converter` (Linux) or
 `%APPDATA%\FL-Stats-Converter` (Windows); `--data-dir` changes that.
 
+## The new SoFIFA base export (German, with contracts, values, loans)
+
+The standard database can be the **German SoFIFA export of all players** (`sofifa-alle-2026-11-24.csv`: `ID;Name;Vollständiger Name;…;Spielstile;Spielstile+;Antritts-Typ;Emotion;Growth profile;…`). Put it into the folder `ea-base` of the data folder: the newest file there (by the date in its name) is the base, no restart. The converter reads from it, besides the 34 attribute values, rating and **potential**:
+
+* **PlayStyles** (*Spielstile* and *Spielstile+*) translated with the table of EA FC 27 (`flconv/data/playstyles_de.json`, 36 PlayStyles; *Harter Pass* = Whipped Pass, *Schnittstellenpass* = Pinged Pass, *Durchsetzungskraft* = Enforcer, …); a name that is not in the table is never guessed, it is left out and reported.
+* **Growth profile**: it scales the youth bonus (Explosive Start x1.3, Meteoric Peak x1.15, Late Bloomer x0.7, the rest x1.0); with the potential of the new base every young player has a bonus, not only those the old export had a potential for.
+* **Emotion**, **acceleration type** (*Antritts-Typ*), work rates, contract, **loan** (*Leihe*: the club he belongs to, until when), value, wage, release clause: shown on the player page (value and wage as tiles). A loaned player is also found by the club he belongs to.
+* The potential is not a field of `Player.bin` (no bit of the 312 byte record follows it: the best correlation is the age); it is used for the youth bonus and shown.
+
 ## SoFIFA updates (new player values, loaded live)
 
 SoFIFA sends CSV files with updated player values: the EA FC export (the columns of `fc27-players.csv`) or the **German SoFIFA export** (`ID;Name;Vollständiger Name;…;Gesamtbewertung;…`, as `sofifa-updates-270007-2026-11-24.csv`; the date is read from the file name). From the German export the rating, potential, club, nation, positions, height, weight, foot, weak foot and the 34 attribute values are taken over; the PlayStyles stay those of the standard database (their German names are not translated). **Tools > SoFIFA update** loads one or several of them, or you copy them into the folder `ea-updates` of the data folder; the tool picks them up within 10 seconds, no restart. For every player the **newest row** counts: a row with a newer snapshot (the `snapshot` column; else the date in the file name, else the day the file was changed) replaces an older update and the standard database, an older row never replaces a newer one, players that the standard database does not have are added. Eight updates in any order are fine. The start page lists every update with its date and how many players it supplies; the player page says "EA FC rating (SoFIFA update 24.11.2026)", and a player whose values changed shows *convert again*.
