@@ -86,20 +86,38 @@ def fm_fit(samples, gk=False):
         if n < 6:
             continue
         err = {}
+        cv = pts if n <= 400 else pts[::-(-n // 400)]   # the cross validation is quadratic: at most 400 players of an even spread, the fit itself uses all
         for mode in ('none', 'shift', 'affine'):
             if mode == 'affine' and n < 12:
                 continue
             e = []
-            for i in range(n):
-                b, c = _lin(pts[:i] + pts[i + 1:], mode)
-                e.append(pts[i][1] - (b * pts[i][0] + c))
-            err[mode] = (sum(x * x for x in e) / n) ** 0.5
+            for i in range(len(cv)):
+                b, c = _lin(cv[:i] + cv[i + 1:], mode)
+                e.append(cv[i][1] - (b * cv[i][0] + c))
+            err[mode] = (sum(x * x for x in e) / len(e)) ** 0.5
         best = min(err, key=lambda m: err[m] + (0.2 if m != 'none' else 0))   # a method has to be at least 0.2 better than doing nothing
         b, c = _lin(pts, best)
         k = n / (n + 4.0)
         out[a] = dict(n=n, mean=round(sum(p[1] - p[0] for p in pts) / n, 2), b=round(1 + (b - 1) * k, 3), a=round(c * k, 2) if best == 'shift' else round((sum(p[1] for p in pts) / n - (1 + (b - 1) * k) * sum(p[0] for p in pts) / n) * (k if best != 'none' else 0), 2),
                       method=best, before=round(err['none'], 2), after=round(err[best], 2))
     return out
+
+
+_CAL = {}
+
+
+def fm_cal(path, gk=False):
+    """-> (number of samples, fit) of the calibration file, worked out once per version of the file (a preview must not fit thousands of players again)"""
+    try:
+        key = (path, os.path.getmtime(path), gk)
+    except OSError:
+        return 0, {}
+    if key not in _CAL:
+        for k in [k for k in _CAL if k[:2] != key[:2]]:   # an older version of the file
+            del _CAL[k]
+        smp = fm_samples(path)
+        _CAL[key] = (len(smp), fm_fit(smp, gk))
+    return _CAL[key]
 
 
 def fm_apply(cal, attr, v):
@@ -148,9 +166,8 @@ def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_cali
             i = fm_text.find('Crossing')
             return dict(ok=False, msg='The FM page lacks: %s. Text around "Crossing" (for the bug report): %s' % (', '.join(miss[:6]), repr(fm_text[max(0, i - 10):i + 40]) if i >= 0 else 'not in the text'))
         stats = sofifa.convert_fm(raw, gk, pos, raw.get('overall'))
-        smp = fm_samples(fm_calib) if fm_calib else []
-        sh = fm_fit(smp, gk)
-        d['fm'] = dict(n=len(smp), active=bool(sh))
+        nsmp, sh = fm_cal(fm_calib, gk) if fm_calib else (0, {})
+        d['fm'] = dict(n=nsmp, active=bool(sh))
         d['fm_est'] = raw.get('_est') or []
         d['source'] = 'FMInside'
         d['src_ovr'] = None

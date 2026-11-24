@@ -52,7 +52,7 @@ Listen aus FMInside (CSV, `;`, erste Spalte `UID`, eine Zeile je Spieler) kommen
 
 * **Fallback-Quelle:** Ein Spieler, den EA FC / SoFIFA nicht hat (kein Treffer), wird aus der Liste umgerechnet, wie eine eingefügte FMInside-Seite (mit der Kalibrierung unten). Ein unsicherer EA-Treffer wird nicht ersetzt, den wählst du wie bisher.
 * **Füllt, was EA FC nicht liefert:** die Positionen (FM *natural* = Stufe 2, *accomplished* = 1, zu den vorhandenen addiert, nie gesenkt), den **schwachen Fuß** (Häufigkeit und Genauigkeit, wird in die `Player.bin` geschrieben; FM 2 / 3 / 4 ergibt 2/2, 2/3, 3/3, an 51 Spielern des Spiels angepasst), bevorzugten Fuß und Größe, wo EA FC keine hat.
-* **Kalibrierung:** Die FM-Umrechnung wird je Attribut auf das Niveau der EA-FC-Umrechnung gebracht (Leave-one-out geprüft: der Abstand von etwa 5,5 Punkten sinkt mit 75 Spielern auf etwa 4,3; ausgeliefert sind 78 Proben mit 3 Torhütern, Torhüter haben eine eigene Anpassung). Eine Liste lässt sich im Feld *FM-Kalibrierung* wie Seitentext einfügen und liefert weitere Proben.
+* **Kalibrierung:** Die FM-Umrechnung wird je Attribut auf das Niveau der EA-FC-Umrechnung gebracht (an Spielern geprüft, die nicht zum Anpassen dienten, 20 % von 2.900 zurückgehalten: Feldspieler 5,7 → 4,3 Punkte Abstand zur EA-FC-Umrechnung, Torhüter 5,6 → 1,7; ausgeliefert ist ein ausgedünnter Satz von 300 Proben, der volle bleibt bei dir; Torhüter haben eine eigene Anpassung). Eine Liste lässt sich im Feld *FM-Kalibrierung* wie Seitentext einfügen und liefert weitere Proben.
 
 ## Änderungen ins laufende Spiel laden (PESM-LivePatch, ohne Neustart)
 
