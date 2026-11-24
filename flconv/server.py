@@ -461,6 +461,9 @@ def nat_names():
 def fm_row(pid):
     """the row of the FM list for a player of the database, or None"""
     l = fm_list()
+    a = ASSIGN.get(str(pid), '')
+    if a.startswith('fm:') and a[3:] in l.rows:   # chosen by the user
+        return l.rows[a[3:]]
     r = l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid), M.height.get(pid), nat_names().get(M.pb.nationality(M.pb.index[pid]))) if len(l) else None
     return r if r is not None and fmdb.plausible(r, pos_of(pid)) else None   # a row that does not fit his position is another player
 
@@ -656,7 +659,7 @@ def ea_refresh():
 def match(pid):
     ea_refresh()
     m = MATCH.get(pid)
-    if m is None and str(pid) in ASSIGN:
+    if m is None and str(pid) in ASSIGN and not ASSIGN[str(pid)].startswith('fm:'):
         m = EA.match('', None, db_id=ASSIGN[str(pid)])
         if m['status'] == 'ok':
             m['why'] = 'assigned by you'
@@ -798,6 +801,54 @@ PROFILE_FIELDS = ('height', 'weight', 'foot')
 PROFILE_RANGE = dict(height=(140, 230), weight=(40, 140))
 
 
+NATION_ALIAS = {'czechia': 'czech republic', 'south korea': 'korea republic', 'north korea': 'korea dpr', 'democratic republic of congo': 'congo dr', 'cape verde islands': 'cape verde',
+                'cote d ivoire': 'ivory coast', 'turkiye': 'turkey'}
+
+
+def nation_key(n):
+    f = fcdb.fold(n or '')
+    return NATION_ALIAS.get(f, f)
+
+
+def corrections_for(pid, row, fmr):
+    """clear errors of the database that EA FC / the FM list contradict: the age (2+ years off) and the nation. Only when the player is certain (exactly this name at this club) and every source that
+    speaks agrees (year of birth, nation) -> {'age'|'nation': {cur, new, src, txt}}. The sources are more correct than the database (user)."""
+    pb = M.pb
+    i = pb.index[pid]
+    me, ck = fcdb.fold(M.name.get(pid) or ''), fcdb.club_key(base_club(pid))
+    src = []   # (label, (y, m, d) or None, nation key)
+    if row and ck & fcdb.club_key(row['club']) and me in (fcdb.fold(row['full']), fcdb.fold(row['raw'].get('common_name'))):
+        try:
+            d, mo, y = [int(x) for x in str(row['raw'].get('birthdate')).split('-')]
+        except ValueError:
+            y = None
+        src.append(('EA FC', (y, mo, d) if y else None, nation_key(row['nation'])))
+    if fmr is not None and ck & fcdb.club_key(fmr.get('Club')) and me in (fcdb.fold(fmr.get('Name')), fcdb.fold(fmr.get('Full name'))):
+        b = fmdb.birth(fmr)
+        d, mo, y = [int(x) for x in b.split('-')] if b else (0, 0, 0)
+        src.append(('FM list', (y, mo, d) if y else None, nation_key(fmr.get('Nationality'))))
+    out = {}
+    if not src:
+        return out
+    labels = ' + '.join(s[0] for s in src)
+    births = [s[1] for s in src if s[1]]
+    if births and len({b[0] for b in births}) == 1:
+        y, mo, d = births[-1]   # the FM list has the real day where EA FC only has 1 January
+        bt = timeshift.BASE
+        a = (bt[0] - y) - (1 if (bt[1], bt[2]) < (mo, d) else 0)
+        if abs(a - M.age[pid]) >= 2:
+            out['age'] = dict(cur=M.age[pid], new=a, src=labels, txt='age %d → %d' % (M.age[pid], a))
+    nats = {s[2] for s in src if s[2]}
+    if len(nats) == 1:
+        n = nats.pop()
+        cn = nat_names()
+        num = next((k for k, v in cn.items() if nation_key(v) == n), None)
+        cur = pb.nationality(i)
+        if num is not None and num != cur:
+            out['nation'] = dict(cur=cur, new=num, src=labels, txt='nation %s → %s' % (cn.get(cur, '#%d' % cur), cn[num]))
+    return out
+
+
 def profile_for(pid, row, edits=None, fmr=None):
     """height, weight and preferred foot: what the database has now and what the EA FC entry (or your own edit) says -> {field: {cur, new, src}}; only fields that have a value"""
     pb = M.pb
@@ -832,6 +883,7 @@ def profile_for(pid, row, edits=None, fmr=None):
     wf = fmdb.weak_foot(fmr) if fmr is not None else None   # weak foot: EA FC data is not used for it, the FM list is
     if wf:
         out['weak_foot'] = dict(cur=(pb.weak_foot_use(i), pb.weak_foot_acc(i)), new=wf, src='FMInside')
+    out.update(corrections_for(pid, row, fmr))
     return out
 
 
@@ -1060,8 +1112,15 @@ def youth_bonus(pid, rating, pot=None, growth=None):
     return int(round(min(3.0, max(0.0, (gap - 5) / 3.0)) * f * GROWTH.get(growth, 1.0)))   # only a clearly large gap counts: from 6 points, +3 at 14; the growth profile makes it more or less
 
 
+def _int_or(v):
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return ''
+
+
 def row_for(pid, db_id=None):
-    if db_id:
+    if db_id and not str(db_id).startswith('fm:'):
         m = EA.match('', None, db_id=db_id)
         return m['row']
     m = match(pid)
@@ -1072,12 +1131,15 @@ def preview(body):
     pid = int(body['pid'])
     i = M.pb.index[pid]
     fm = body.get('fm') or None
+    if str(body.get('db_id') or '').startswith('fm:') and ASSIGN.get(str(pid)) != body['db_id']:   # a player of the FM list chosen by the user: remembered, his values are taken
+        assign_set(pid, body['db_id'])
+        src_set(pid, 'fm')
     ea_row = None if fm else row_for(pid, body.get('db_id'))
     row = ea_row
     fmr = fm_row(pid)
     fm_ok = fmr is not None and fmdb.complete(fmr)
     from_list = False
-    want = body.get('source') or SRC.get(str(pid))   # the tab of the player page / what the user chose for this player before
+    want = 'fm' if str(body.get('db_id') or '').startswith('fm:') else body.get('source') or SRC.get(str(pid))   # the tab of the player page / what the user chose for this player before
     if row is not None and not fm and fm_ok and sofifa_missing(row, pos_of(pid)):   # the standard database has holes for this player: the FM list takes over
         want = 'fm'
     if want == 'fm' and not fm and fm_ok:   # EA FC has him, but the user wants the FM values
@@ -2048,7 +2110,7 @@ class H(BaseHTTPRequestHandler):
                 p = paste_take() if PASTE else {}
                 self.send_json(dict(ok=True, pending=bool(p), text=p.get('text'), names=p.get('names'), matches=paste_matches(p['names']) if p else []))
             elif u.path == '/api/search':
-                self.send_json(dict(ok=True, items=[dict(id=x['id'], name=x['name'], club=x['club'], rating=x['rating'], pos=x['pos'], nation=x['nation']) for x in EA.search(q['q'][0], 14)]))
+                self.send_json(dict(ok=True, items=[dict(id=x['id'], name=x['name'], club=x['club'], rating=x['rating'], pos=x['pos'], nation=x['nation']) for x in EA.search(q['q'][0], 14)] + [dict(id='fm:' + r['UID'], name=r.get('Name'), club=r.get('Club'), rating=_int_or(r.get('Ability (0-99)')), pos=(r.get('Positions') or '').split(',')[0], nation=r.get('Nationality'), fm=True) for r in fm_list().search(q['q'][0], 14)]))
             elif u.path == '/api/candidates':
                 self.send_json(dict(ok=True, items=candidates(int(q['pid'][0]), (q.get('q') or [None])[0])))
             elif u.path == '/api/fmcal':

@@ -60,6 +60,12 @@ class PlayerBin:
         """age in the year the database was made (6 bit field + 15)"""
         return self.bits(i, 408, 6) + 15
 
+    def set_age(self, i, a):
+        self.set_bits(i, 408, 6, max(15, min(78, int(a))) - 15)
+
+    def set_nation(self, i, n):
+        self.set_bits(i, 233, 9, int(n))
+
     def height(self, i):
         """cm (8 bit field + 100)"""
         return self.bits(i, 216, 8) + 100

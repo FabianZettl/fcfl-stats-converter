@@ -43,6 +43,12 @@ class FMList:
     def __len__(self):
         return len(self.rows)
 
+    def search(self, q, n=14):
+        """free search (all words of q in name / club / nation), rows with all values and the better ones first"""
+        ws = fcdb.fold(q).split()
+        hits = [r for r in self.rows.values() if ws and all(w in ' '.join(fcdb.fold(r.get(k)) for k in ('Name', 'Full name', 'Club', 'Nationality')) for w in ws)]
+        return sorted(hits, key=lambda r: (not complete(r), -(_int(r.get('Ability (0-99)')) or 0)))[:n]
+
     def find(self, name, club=None, age=None, height=None, nation=None, min_score=0):
         """the player of the list for a player of the database, or None. Candidates have his name; each gets points for what fits (club, age, height) and loses points for what does
         not: club (some word of the club name is the same) +2, unknown or another club 0 (players move); age 0 / 1 / 2 / more years apart +2 / +1 / -1 / -3; height within 2 cm / 5 cm / more

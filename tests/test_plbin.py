@@ -28,6 +28,8 @@ assert (pb.height(1), pb.weight(1), pb.foot(1)) == (195, 88, 'Left') and (pb.hei
 assert pb.get(1, 'Speed') == 99 and pb.get(1, 'Stamina') == 40   # the attributes are untouched
 pb.set_foot(1, 'Right')
 assert pb.foot(1) == 'Right' and pb.height(1) == 195
+pb.set_age(1, 27); pb.set_nation(1, 300)
+assert (pb.age(1), pb.nationality(1), pb.height(1), pb.weight(1)) == (27, 300, 195, 88) and pb.age(0) == 15 and pb.nationality(0) == 0
 pb.set_skills(1, {'Heading', 'Long Throw'}); pb.set_com_styles(1, {'Speeding Bullet'}); pb.set_playing_style(1, 'Target Man')
 assert pb.skills(1) == {'Heading', 'Long Throw'} and pb.com_styles(1) == {'Speeding Bullet'} and pb.playing_style(1) == 'Target Man'
 assert pb.skills(0) == set() and pb.playing_style(0) == 'Balanced' and (pb.height(1), pb.weight(1)) == (195, 88)
