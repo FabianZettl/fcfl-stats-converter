@@ -418,6 +418,17 @@ def fm_row(pid):
     return l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid)) if len(l) else None
 
 
+def convertible(pid):
+    """a player the tool can convert by itself: found unambiguously in EA FC, or not in EA FC at all but with every attribute in the FM list"""
+    st = match(pid)['status']
+    if st == 'ok':
+        return True
+    if st != 'none':
+        return False
+    fr = fm_row(pid)
+    return fr is not None and fmdb.complete(fr)
+
+
 def club_name(pid):
     ls = live_squads()
     return M.team.get((ls[1].get(pid) if ls and pid in ls[1] else M.club_of.get(pid)), '')
@@ -971,7 +982,7 @@ def apply(body):
     choices = {int(k): v for k, v in (body.get('choices') or {}).items()}
     pids = [int(p) for p in body.get('pids') or []]
     for t in body.get('tids') or []:   # whole clubs: every player that is found unambiguously
-        pids += [p for p in squad_of(int(t)) if match(p)['status'] == 'ok' and p not in pids]
+        pids += [p for p in squad_of(int(t)) if convertible(p) and p not in pids]
     report, writes, srcs, names, profs = [], {}, {}, {}, {}
     sk_n = fm_n = 0
     for pid in pids:
@@ -1376,7 +1387,7 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                 cnt['already'] += 1
                 continue
             m = match(pid)
-            if m['status'] == 'ok' or (m['status'] == 'none' and fm_row(pid) is not None and fmdb.complete(fm_row(pid))):   # EA FC, else the FM list (preview takes it as the fallback)
+            if convertible(pid):   # EA FC, else the FM list (preview takes it as the fallback)
                 p = preview(dict(pid=pid, youth=youth, skills=skills, psboost=psboost))
                 if not p.get('ok'):
                     cnt['failed'] += 1
