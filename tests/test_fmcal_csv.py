@@ -11,5 +11,6 @@ text = '﻿UID;Name;Club;Ability (0-99);Potential (0-99);Crossing;Acceleration;O
 (name, club, raw), = fmcal.csv_items(text)
 assert (name, club) == ('Kylian Mbappé', 'R. Madrid')
 assert raw['Crossing'] == 65 and raw['Acceleration'] == 99 and raw['Pace'] == 95   # 5 x, at most 99
+assert raw.pop('_gk') is False
 assert 'Off the Ball' not in raw and raw['overall'] == 96 and raw['potential'] == 99   # a value that is not a number is left out
 print('ok')

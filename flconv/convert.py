@@ -72,14 +72,15 @@ def _lin(pts, mode):
     return b, my - b * mx
 
 
-def fm_fit(samples):
+def fm_fit(samples, gk=False):
     """FM conversion -> EA FC conversion per attribute from players that are on both sides. For every attribute the method (nothing / shift / shift + slope) is chosen by
     leave-one-out cross validation: it is only used when it makes the error against the EA FC values clearly smaller on players it was not fitted on.
     -> {attribute: dict(n, mean, b, a, method, before, after)}"""
     out = {}
+    samples = [x for x in samples if bool(x.get('gk')) == gk]   # keepers have their own fit (all 25 attributes), field players the 20 field attributes
     if len(samples) < 6:
         return out
-    for a in AB[:20]:
+    for a in (AB if gk else AB[:20]):
         pts = [(x['fm'][a], x['ea'][a]) for x in samples if a in x['fm'] and a in x['ea']]
         n = len(pts)
         if n < 6:
@@ -148,7 +149,7 @@ def preview(pb, i, pos, ea_db=None, row=None, fm_text=None, target=None, fm_cali
             return dict(ok=False, msg='The FM page lacks: %s. Text around "Crossing" (for the bug report): %s' % (', '.join(miss[:6]), repr(fm_text[max(0, i - 10):i + 40]) if i >= 0 else 'not in the text'))
         stats = sofifa.convert_fm(raw, gk, pos, raw.get('overall'))
         smp = fm_samples(fm_calib) if fm_calib else []
-        sh = fm_fit(smp) if not gk else {}
+        sh = fm_fit(smp, gk)
         d['fm'] = dict(n=len(smp), active=bool(sh))
         d['fm_est'] = raw.get('_est') or []
         d['source'] = 'FMInside'
