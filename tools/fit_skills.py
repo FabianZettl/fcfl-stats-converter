@@ -11,7 +11,7 @@ import plbin, fcdb, dbmeta
 
 pesdb = sys.argv[1]
 pb = plbin.PlayerBin(os.path.join(pesdb, 'Player.bin'))
-EA = fcdb.load(os.path.join(HERE, '..', 'flconv', 'data', 'sofifa-base.csv'))
+EA = fcdb.load(os.path.join(HERE, '..', 'flconv', 'data', 'sofifa-base-270008-2026-11-18.csv'))
 ATTR = list(fcdb.COLS.keys())
 OUT = [c for c in ATTR if not c.startswith('gk_')]
 GKA = [c for c in ATTR if c.startswith('gk_')]

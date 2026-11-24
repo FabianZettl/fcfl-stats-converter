@@ -42,6 +42,12 @@ def _int(v):
         return None
 
 
+def _lead(v):
+    """'70+1' / '66-1' (an update of SoFIFA shows the change next to the value) -> 70 / 66; '75' -> 75; None for anything else"""
+    m = re.match(r'\s*(\d+)', str(v or ''))
+    return int(m.group(1)) if m else None
+
+
 def _year(v):
     m = re.search(r'(\d{4})\s*$', str(v or ''))
     return int(m.group(1)) if m else None
@@ -54,6 +60,11 @@ def _date(v):
         return int(m.group(3)), int(m.group(2)), int(m.group(1))
     m = re.match(r'\s*(\d{4})-(\d{2})-(\d{2})', str(v or ''))
     return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+
+
+def _key(r, date):
+    """what makes a row newer than another: the roster version of SoFIFA first (a row of roster 270008 beats every row of an older roster), then the date"""
+    return (int(r.get('roster') or 0), date)
 
 
 def _read(path):
@@ -130,6 +141,12 @@ def _sniff_kind(path):
     return 'ea' if 'base_id' in cols and 'rating' in cols else 'de' if 'ID' in cols and 'Gesamtbewertung' in cols else None
 
 
+def _roster(link, path):
+    """the roster version of SoFIFA (270008): in the Link of the row, else in the file name; None when there is none. A higher roster is newer, whatever the dates say."""
+    m = re.search(r'/(\d{6})/?\s*$', str(link or '')) or re.search(r'(?<!\d)(27\d{4})(?!\d)', os.path.basename(path))
+    return int(m.group(1)) if m else None
+
+
 def read_update(path):
     """the rows of an update in the form of the EA FC export (dicts of strings), or None when the file is no update: the EA FC export itself (column base_id) or the German SoFIFA export
     (columns ID and Gesamtbewertung; only what can be translated safely is taken over: rating, potential, club, nation, position, height, weight, foot, weak foot, skill moves, the 34
@@ -146,7 +163,7 @@ def read_update(path):
     snap = '%s-%s-%s' % (m.group(3), m.group(2), m.group(1)) if m else '%02d-%02d-%d' % (mt.tm_mday, mt.tm_mon, mt.tm_year)
     out = []
     for r in rows:
-        if not (r.get('ID') or '').strip().isdigit() or not _int(r.get('Gesamtbewertung')):
+        if not (r.get('ID') or '').strip().isdigit() or not _lead(r.get('Gesamtbewertung')):
             continue
         full = (r.get('Vollständiger Name') or r.get('Name') or '').strip()
         parts = full.split()
@@ -158,12 +175,12 @@ def read_update(path):
         n = dict(base_id=r['ID'].strip(), stats_id=r['ID'].strip(), first_name=parts[0] if len(parts) > 1 else full, last_name=' '.join(parts[1:]), full_name=full, common_name=common,   # the legal full name: the first word, then the rest (every part of it is indexed as a surname)
                  nation_name=_country((r.get('Nationalität') or '').strip()), club_name=(r.get('Verein') or '').strip(), position=pos[0] if pos else '',
                  position_alt=pos[1] if len(pos) > 1 else '', position_alt_2=pos[2] if len(pos) > 2 else '', position_alt_3=pos[3] if len(pos) > 3 else '',
-                 rating=str(_int(r['Gesamtbewertung'])), potential=str(_int(r.get('Potenzial')) or ''), height=h.group(1) if h else '', weight=w.group(1) if w else '',
-                 foot={'Rechts': 'Right', 'Links': 'Left'}.get((r.get('foot') or r.get('Starker Fuß') or '').strip(), ''), weak_foot=str(_int(r.get('Schwacher Fuß')) or ''), skill_moves=str(_int(r.get('Spezialbewegungen')) or ''),
+                 rating=str(_lead(r['Gesamtbewertung'])), potential=str(_lead(r.get('Potenzial')) or ''), height=h.group(1) if h else '', weight=w.group(1) if w else '',
+                 foot={'Rechts': 'Right', 'Links': 'Left'}.get((r.get('foot') or r.get('Starker Fuß') or '').strip(), ''), weak_foot=str(_lead(r.get('Schwacher Fuß')) or ''), skill_moves=str(_lead(r.get('Spezialbewegungen')) or ''),
                  birthdate='01-01-%s' % r['Geburtsjahr'].strip() if (r.get('Geburtsjahr') or '').strip().isdigit() else '', snapshot=snap)
         for de, en in _DE_COLS.items():
-            if _int(r.get(de)) is not None:
-                n[en] = str(_int(r[de]))
+            if _lead(r.get(de)) is not None:
+                n[en] = str(_lead(r[de]))
         ps = _playstyles(r.get('Spielstile'), r.get('Spielstile+'))
         if ps or 'Spielstile' in r:
             n['playstyles'] = ps   # a player of the export without PlayStyles has none (an empty value would not replace the old ones in an update: see DB)
@@ -175,6 +192,9 @@ def read_update(path):
                  emotion='' if (r.get('Emotion') or '').strip() in ('N/A', 'PLAYER_EMOTION_0') else (r.get('Emotion') or '').strip(),
                  work_rate_att=_DE_WORK.get((r.get('Offensiv-Arbeitsrate') or '').strip(), ''), work_rate_def=_DE_WORK.get((r.get('Defensiv-Arbeitsrate') or '').strip(), ''),
                  international_reputation=str(_int(r.get('Internationale Reputation')) or ''), shirt_number=str(_int(r.get('Club kit number')) or ''))
+        rs = _roster(r.get('Link'), path)
+        if rs:
+            n['roster'] = str(rs)
         out.append(n)
     return out
 
@@ -210,16 +230,19 @@ class DB:
         self.updates = []   # [dict(name, date, rows, used)]
         base = read_update(path) if _sniff_kind(path) == 'de' else _read(path)
         cur = {}   # base_id -> (date, row dict, label)
+        broster = max((int(r.get('roster') or 0) for r in base), default=0)   # the roster version of the standard database (German SoFIFA export)
         for r in base:
-            cur[r.get('base_id') or r['stats_id']] = (_date(r.get('snapshot')) or (), r, 'standard')
+            cur[r.get('base_id') or r['stats_id']] = (_key(r, _date(r.get('snapshot')) or ()), r, 'standard')
         for u in updates:
             n = used = 0
             for r in read_update(u['path']) or []:
                 n += 1
-                k, d = r.get('base_id') or r.get('stats_id'), _date(r.get('snapshot')) or u['date']
+                k, d = r.get('base_id') or r.get('stats_id'), _key(r, _date(r.get('snapshot')) or u['date'])
                 if k not in cur:
+                    if d[0] and d[0] < broster:   # a player that the newer roster of the standard database does not have is gone from the game: an older update does not bring him back
+                        continue
                     cur[k] = (d, r, u['name'])
-                elif d >= (cur[k][0] or ()):   # the same player: what the update says replaces the values, what it does not say (PlayStyles, ...) stays
+                elif d > cur[k][0] or (d == cur[k][0] and cur[k][2] != 'standard'):   # newer; at the same age a later update wins over an earlier one, but not over the standard database   # the same player: what the update says replaces the values, what it does not say (PlayStyles, ...) stays
                     nr = dict(cur[k][1])
                     nr.update({a: b for a, b in r.items() if b not in ('', None)})
                     cur[k] = (d, nr, u['name'])
@@ -233,7 +256,7 @@ class DB:
             row = dict(id=r['stats_id'] or r['base_id'], name='%s %s' % (r.get('first_name', ''), r.get('last_name', '')) if not r.get('common_name') else r['common_name'],
                        full=(first + ' ' + last).strip(), first=first, last=last, club=r.get('club_name', ''), ck=club_key(r.get('club_name')), nation=r.get('nation_name', ''),
                        pos=r.get('position', ''), alt=[r.get(k, '') for k in ('position_alt', 'position_alt_2', 'position_alt_3') if r.get(k)], rating=_int(r.get('rating')),
-                       potential=_int(r.get('potential')), height=_int(r.get('height')), byear=_year(r.get('birthdate')), raw=r, upd=None if lab == 'standard' else lab, upd_date=d)
+                       potential=_int(r.get('potential')), height=_int(r.get('height')), byear=_year(r.get('birthdate')), raw=r, upd=None if lab == 'standard' else lab, upd_date=d[1])
             self.rows.append(row)
             for k in {row['full'], fold(r.get('common_name')), fold(r.get('full_name'))}:
                 if k:
