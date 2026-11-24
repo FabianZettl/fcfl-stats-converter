@@ -2,7 +2,7 @@
 
 Releases of FCFL - Stats Converter, newest first. (`CHANGES.md` lists what is different from the PES Stats Converter this tool started from.)
 
-## v0.7.4 - (not released yet)
+## v0.7.4 - 2026-11-24
 * **"Values are as of" can be changed** in the settings (it was fixed to 01.09.2026). Automatic = the date of the standard database or of the newest update that brought something (24.11.2026 now); a typed date overrides it, *Automatic* takes it back. The development to the write date and the age of the players count from it.
 * FM list of 33,000 players (19,800 with every attribute); FM calibration from 10,400 players: field players 5.8 -> 4.3, keepers 5.7 -> 1.9.
 * **Clear errors of the database are corrected** (age 2+ years off, wrong nation) when the player is certain (exactly this name at this club) and every source that speaks (EA FC, FM list) agrees; shown as 'Corrected ...' under the profile, written with the profile. Several German country names of the SoFIFA export were not translated (Tschechische Repub., Korea Republik, Bosnien-Herzegowina ...): fixed.
