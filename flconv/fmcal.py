@@ -1,5 +1,7 @@
 """Calibration of the FM conversion: players that are in the EA FC database and on FMInside give pairs (FM conversion, EA FC conversion); the fit (convert.fm_fit) moves the
 FM values to the level of the EA FC values per attribute."""
+import csv
+import io
 import json
 import os
 import re
@@ -26,27 +28,37 @@ def info(page):
     return dict(name=m.group(1).strip(), age=int(m.group(2)), pos=m.group(3).strip(), club=m.group(4).strip())
 
 
+def csv_items(text):
+    """a list exported from FMInside (one row per player, ';', columns with the names of the FM attributes, 1-20: scaled to the 0-99 of the page here) -> [(name, club, values as sofifa.parse_fm gives them)]"""
+    out = []
+    for r in csv.DictReader(io.StringIO(text.lstrip('\ufeff')), delimiter=';'):
+        raw = {lab: min(99, int(r[lab]) * 5) for lab in sofifa.FM_LABELS.values() if (r.get(lab) or '').strip().isdigit()}   # the page shows 1-20 scaled to 0-99, parse_fm gives that
+        for key, col in (('overall', 'Ability (0-99)'), ('potential', 'Potential (0-99)')):
+            if (r.get(col) or '').strip().isdigit():
+                raw[key] = int(r[col])
+        out.append((r.get('Name', ''), r.get('Club'), raw))
+    return out
+
+
 def add(text, ea_db, path):
-    pages = split_pages(text)
+    items = csv_items(text) if (text or '').lstrip('\ufeff').startswith('UID;') else [(i.get('name', ''), i.get('club'), sofifa.parse_fm(pg)) for pg in split_pages(text) for i in [info(pg)]]
     samples = convert.fm_samples(path)
     rep = []
-    for pg in pages:
-        i = info(pg)
-        raw = sofifa.parse_fm(pg)
+    for name, club, raw in items:
         if raw.get('_est'):
-            rep.append(dict(name=i.get('name'), ok=False, msg='hidden or ranged attributes (%s): log in to FMInside or take a page with exact values' % ', '.join(raw['_est'])))
+            rep.append(dict(name=name, ok=False, msg='hidden or ranged attributes (%s): log in to FMInside or take a page with exact values' % ', '.join(raw['_est'])))
             continue
         if sofifa.missing_fm(raw, False):
-            rep.append(dict(name=i.get('name'), ok=False, msg='goalkeeper or incomplete page'))
+            rep.append(dict(name=name, ok=False, msg='goalkeeper or incomplete page'))
             continue
-        m = ea_db.match(i.get('name', ''), i.get('club'), None, False)
+        m = ea_db.match(name, club, None, False)
         if m['status'] != 'ok':
-            rep.append(dict(name=i.get('name'), ok=False, msg='not found in the EA FC database' if m['status'] == 'none' else 'several players with this name'))
+            rep.append(dict(name=name, ok=False, msg='not found in the EA FC database' if m['status'] == 'none' else 'several players with this name'))
             continue
         row = m['row']
         pos = convert.EAPOS.get(row['pos'], 5)
         if pos == 0:
-            rep.append(dict(name=i.get('name'), ok=False, msg='goalkeeper'))
+            rep.append(dict(name=name, ok=False, msg='goalkeeper'))
             continue
         base = sofifa.convert(ea_db.stats(row, False), False)
         ea = {a: poscal.correct(pos, a, v)[0] for a, v in base.items() if not a.startswith('GK')}
