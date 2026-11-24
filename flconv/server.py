@@ -450,7 +450,7 @@ def convertible(pid):
     st = match(pid)['status']
     if st == 'ok':
         return True
-    if st != 'none':
+    if st not in ('none', 'ambiguous'):   # an uncertain EA FC match counts as not found: the FM list takes over
         return False
     fr = fm_row(pid)
     return fr is not None and fmdb.complete(fr)
@@ -458,10 +458,7 @@ def convertible(pid):
 
 def fm_info(fr):
     """what the FM list knows about the player, for the player page (the counterpart of what the EA FC entry shows)"""
-    try:
-        bd = time.strftime('%d-%m-%Y', time.strptime((fr.get('Date of birth') or '').strip(), '%d %B %Y'))
-    except ValueError:
-        bd = ''
+    bd = fmdb.birth(fr)
     roles = [re.sub(r'\s+[\d.]+$', '', x.strip()) for x in (fr.get('Roles (FMInside score)') or '').split('|')][:4]
     n = lambda k: fmdb._int(fr.get(k))
     return dict(full=(fr.get('Full name') or fr.get('Name') or '').strip(), nation=(fr.get('Nationality') or '').strip(), birthdate=bd, club=(fr.get('Club') or '').strip(), fm_pos=(fr.get('Positions') or '').strip(),
@@ -573,6 +570,14 @@ def match(pid):
             x = fuzzy(pid)
             if x:
                 m = dict(status='ok', row=x, candidates=[], why='similar name in the club')
+        elif m['status'] == 'ambiguous' and m.get('candidates'):   # several EA FC players of this name: the FM list knows the date of birth and the nation
+            fr = fm_row(pid)
+            if fr is not None:
+                for key in (lambda x: fmdb.birth(fr) and (x['raw'].get('birthdate') or '') == fmdb.birth(fr), lambda x: fcdb.fold(x.get('nation')) == fcdb.fold(fr.get('Nationality'))):
+                    c = [x for x in m['candidates'] if key(x)]
+                    if len(c) == 1:
+                        m = dict(status='ok', row=c[0], candidates=[], why='date of birth / nation of the FM list')
+                        break
         MATCH[pid] = m
     return m
 
@@ -671,7 +676,7 @@ def pl_row(pid, youth=True):
     fr = fm_row(pid)
     if m['status'] == 'ok':   # where the values come from: EAFC; FM too when the FM list has position ratings / the weak foot of the player
         d['found'] = 'EAFC & FM' if fr is not None and fmdb.detail(fr) else 'EAFC'
-    elif m['status'] == 'none' and fr is not None and fmdb.complete(fr):
+    elif m['status'] in ('none', 'ambiguous') and fr is not None and fmdb.complete(fr):
         d['found'] = 'FM'
     return d
 
@@ -963,7 +968,7 @@ def preview(body):
     want = body.get('source') or SRC.get(str(pid))   # the tab of the player page / what the user chose for this player before
     if want == 'fm' and not fm and fm_ok:   # EA FC has him, but the user wants the FM values
         fm, row, from_list = fmdb.page_text(fmr), None, True
-    if not fm and row is None and fmr is not None and fmdb.complete(fmr) and match(pid)['status'] == 'none':   # no EA FC / SoFIFA data (an uncertain match is not 'none': the user chooses): the FM list is the fallback, converted like a pasted FMInside page
+    if not fm and row is None and fmr is not None and fmdb.complete(fmr) and match(pid)['status'] in ('none', 'ambiguous'):   # no EA FC / SoFIFA data, or an uncertain match (the page still offers the EA FC candidates): the FM list is the fallback, converted like a pasted FMInside page
         fm, from_list = fmdb.page_text(fmr), True
     if not fm and row is None:
         m = match(pid)

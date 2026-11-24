@@ -4,6 +4,7 @@ import csv
 import glob
 import os
 import re
+import time
 
 import fcdb
 import sofifa
@@ -34,6 +35,10 @@ class FMList:
             for n in {fcdb.fold(r.get('Name')), fcdb.fold(r.get('Full name'))}:
                 if n:
                     self.by_name.setdefault(n, []).append(r)
+        self.by_tok = {}
+        for r in self.rows.values():
+            for t in {t for n in (fcdb.fold(r.get('Name')), fcdb.fold(r.get('Full name'))) for t in n.split() if len(t) > 2}:
+                self.by_tok.setdefault(t, []).append(r)
 
     def __len__(self):
         return len(self.rows)
@@ -44,7 +49,7 @@ class FMList:
         +2 / 0 / -2; nation (the same country name) +2, another -2, unknown 0. The best one is taken when it has at least `min_score` points and is at least one point ahead of the next."""
         c = list(self.by_name.get(fcdb.fold(name), []))
         if not c:
-            return None
+            return self._fuzzy(name, club, age, height, nation)
         ck = fcdb.club_key(club) if club else frozenset()
         sc = []
         for r in c:
@@ -62,6 +67,35 @@ class FMList:
         if sc[0][0] < min_score or (len(sc) > 1 and sc[0][0] - sc[1][0] < 1):
             return None
         return sc[0][1]
+
+
+    def _fuzzy(self, name, club, age, height, nation):
+        """no player has exactly this name (Neymar Jr / Neymar, Juan Cuadrado / Juan Guillermo Cuadrado, a Brazilian with one name): a player that shares a word of the name AND has the same club,
+        an age within 1 year, the height within 3 cm and the same nation (where those are known). Only when exactly one fits."""
+        toks = [t for t in fcdb.fold(name).split() if len(t) > 2]
+        ck = fcdb.club_key(club) if club else frozenset()
+        if not toks or not ck or age is None:
+            return None
+        cand = {}
+        for t in toks:
+            for r in self.by_tok.get(t, []):
+                cand[r['UID']] = r
+        ok = []
+        last = toks[-1]
+        for r in cand.values():
+            rt = {t for n in (fcdb.fold(r.get('Name')), fcdb.fold(r.get('Full name'))) for t in n.split()}
+            one = len(fcdb.fold(r.get('Name')).split()) == 1 and fcdb.fold(r.get('Name')) == toks[0]   # a player with one name (Fábio, Neymar)
+            if last not in rt and not one:   # a shared first name alone is no evidence
+                continue
+            a, h = _int(r.get('Age')), height_of(r)
+            if a is None or abs(a - age) > 1 or not (ck & fcdb.club_key(r.get('Club'))):
+                continue
+            if height and h and abs(h - height) > 3:
+                continue
+            if nation and (r.get('Nationality') or '').strip() and fcdb.fold(nation) != fcdb.fold(r['Nationality']):
+                continue
+            ok.append(r)
+        return ok[0] if len(ok) == 1 else None
 
 
 def _int(v):
@@ -141,6 +175,14 @@ def weak_foot(r):
 def foot(r):
     f = (r.get('Footedness') or '').strip().capitalize()
     return f if f in ('Left', 'Right') else None
+
+
+def birth(r):
+    """date of birth as EA FC writes it (DD-MM-YYYY), or ''"""
+    try:
+        return time.strftime('%d-%m-%Y', time.strptime((r.get('Date of birth') or '').strip(), '%d %B %Y'))
+    except ValueError:
+        return ''
 
 
 def height_of(r):

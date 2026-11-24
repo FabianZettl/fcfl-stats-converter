@@ -64,4 +64,15 @@ assert two.find('Kylian Mbappé', 'Bayern München', 27, 178) is not None       
 assert two.find('Kylian Mbappé', 'R. Madrid', 27, 195) is not None             # 17 cm off, but club and age fit (2 + 2 - 2 = 2)
 assert two.find('Kylian Mbappé', 'Bayern München', 29, 195) is None            # nothing fits: another player with the same name
 assert two.find('Kylian Mbappé', None, 28, 190) is None                        # no club, age 1 year off (+1), height 12 cm off (-2): -1 points
+# names that differ: found by a shared word AND club, age, height and nation, but not by a first name alone
+fz = tempfile.mkdtemp()
+open(os.path.join(fz, 'f.csv'), 'w', encoding='utf-8-sig').write('\n'.join([';'.join(head + ['Nationality']),
+    row('11', 'Neymar', 'Santos', 33, Height='175 CM') + ';Brazil', row('12', 'Juan Guillermo Cuadrado', 'Millonarios F.C.', 37, Height='178 CM') + ';Colombia',
+    row('13', 'Luka Vrbančić', 'Osijek', 20, Height='182 CM') + ';Croatia']) + '\n')
+F = fmdb.FMList([fz])
+assert F.find('Neymar Jr', 'Santos FC', 33, 175, 'Brazil')['UID'] == '11'            # one name in FM: its word is the first word of the name
+assert F.find('Juan Cuadrado', 'Millonarios FC', 37, 178, 'Colombia')['UID'] == '12'   # the surname is shared, club / age / height / nation fit
+assert F.find('Luka Tunjić', 'NK Osijek', 19, 183, 'Croatia') is None                  # only the first name is shared: another player
+assert F.find('Juan Cuadrado', 'Millonarios FC', 37, 178, 'Argentina') is None         # another nation
+assert F.find('Juan Cuadrado', 'Real Madrid', 37, 178, 'Colombia') is None             # another club
 print('ok')
