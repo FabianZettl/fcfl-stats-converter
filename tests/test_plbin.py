@@ -35,6 +35,10 @@ pb.set_skills(1, set())
 assert pb.skills(1) == set() and pb.com_styles(1) == {'Speeding Bullet'}
 pb.set_positions(1, [0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 assert pb.positions(1) == [0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and pb.positions(0) == [0] * 13 and pb.skills(1) == set()
+pb.set_weak_foot(1, (2, 4))
+assert (pb.weak_foot_use(1), pb.weak_foot_acc(1)) == (2, 4) and (pb.weak_foot_use(0), pb.weak_foot_acc(0)) == (1, 1) and pb.positions(1)[1] == 2   # weak foot: only its own bits
+pb.set_weak_foot(1, (9, 0))
+assert (pb.weak_foot_use(1), pb.weak_foot_acc(1)) == (4, 1)   # out of range is cut
 pb.save()
 pb2 = plbin.PlayerBin(path)   # what was written is what is read again
 assert pb2.get(1, 'Speed') == 99 and pb2.get_name(2, 'name') == 'Ben Winterburn' and pb2.changed() == []

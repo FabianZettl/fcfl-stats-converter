@@ -25,6 +25,7 @@ What is different or new:
 | Names | – | names and shirt names can be edited or taken from the EA data (common name where there is one) |
 | Live data | – | line-up, bench and shirt numbers of the last match and the performance since 01.09.2026 from Sofascore (unofficial JSON through `curl`, throttled and cached): the line-up goes into `PlayerAssignment.bin`, the performance moves single values a little (see README) |
 | Club view | – | pitch with the starting eleven in the formation of the database itself (`Tactics.bin`, read only), team ratings, squad list with line-up, number, overall and form |
+| FM list | pasted FMInside pages | lists exported from FMInside (CSV) in the data folder `fmdb`: fallback source for players EA FC / SoFIFA does not have, fills positions, **weak foot** (now written), foot and height; the FM conversion is calibrated to the EA FC level (keepers too) |
 | Live loading | – | **PESM-LivePatch** (Sider module): attributes, line-ups, shirt numbers and formations written by the converter or PESM reach the running game with F7 in the overlay, no restart |
 | Running Master League | attributes | also skills, COM styles, playing style, positions, height, weight and foot, through a `GrowthBridge.lua` that the tool ships and checks in the Sider modules folder |
 

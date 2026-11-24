@@ -9,6 +9,7 @@ import time
 
 import convert
 import fcdb
+import fmdb
 import gkcal
 import poscal
 import sofifa
@@ -33,10 +34,7 @@ def csv_items(text):
     """a list exported from FMInside (one row per player, ';', columns with the names of the FM attributes, 1-20: scaled to the 0-99 of the page here) -> [(name, club, values as sofifa.parse_fm gives them)]"""
     out = []
     for r in csv.DictReader(io.StringIO(text.lstrip('\ufeff')), delimiter=';'):
-        raw = {lab: min(99, int(r[lab]) * 5) for lab in sofifa.FM_LABELS.values() if (r.get(lab) or '').strip().isdigit()}   # the page shows 1-20 scaled to 0-99, parse_fm gives that
-        for key, col in (('overall', 'Ability (0-99)'), ('potential', 'Potential (0-99)')):
-            if (r.get(col) or '').strip().isdigit():
-                raw[key] = int(r[col])
+        raw = fmdb.raw(r)
         raw['_gk'] = (r.get('Positions') or '').strip().startswith('GK')   # the EA FC match must look for a keeper
         out.append((r.get('Name', ''), r.get('Club'), raw))
     return out

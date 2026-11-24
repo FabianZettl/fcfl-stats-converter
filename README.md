@@ -52,6 +52,14 @@ The tool opens `http://127.0.0.1:8790/` in your browser (it only listens on your
 Settings, backups and the copy of your original `Player.bin` are kept in `~/.local/share/fl-stats-converter` (Linux) or
 `%APPDATA%\FL-Stats-Converter` (Windows); `--data-dir` changes that.
 
+## FM list (FMInside export) as fallback and filler
+
+Put lists exported from FMInside (CSV, `;`, first column `UID`, one row per player) into the folder `fmdb` of the data folder (`~/.local/share/fl-stats-converter/fmdb/` on Linux; several files are fine, a later file wins by UID; the lists are not part of this repository). The converter then uses them like this:
+
+* **Fallback source:** a player that EA FC / SoFIFA does not have (no match) is converted from the list, like a pasted FMInside page (with the calibration below). An uncertain EA match is not replaced, you choose it as before.
+* **Fills what EA FC does not give:** the positions (FM *natural* = level 2, *accomplished* = 1, added to what the player has, never lowered), the **weak foot** (use and accuracy, written into `Player.bin`; FM 2 / 3 / 4 gives 2/2, 2/3, 3/3, fitted on 51 players of the game), preferred foot and height where EA FC has none.
+* **Calibration:** the FM conversion is moved to the level of the EA FC conversion per attribute (leave-one-out validated: the difference of about 5.5 points drops to about 4.3 with 75 players; the ship has 78 samples including 3 keepers, keepers have their own fit). A list can be pasted into the *FM calibration* box like page text to add samples.
+
 ## Loading changes into the running game (PESM-LivePatch, no restart)
 
 When the converter writes `Player.bin` (attributes) or a line-up, it also writes small patch files into `<Sider>/content/pesm-livepatch/` and ships the Sider module

@@ -46,6 +46,14 @@ Alles Weitere (Zuordnung der Spieler, Umrechnung, Jugendbonus, Entwicklung, Sich
 die Änderungen gegenüber dem PES Stats Converter in [CHANGES.md](CHANGES.md), die Datenquellen in [DATA.md](DATA.md).
 Die Umrechnung geht immer von den **Originalwerten** aus (beim ersten Benutzen einer Datenbank wird eine Kopie angelegt): zweimal ausführen gibt dasselbe Ergebnis.
 
+## FM-Liste (FMInside-Export) als Fallback und Lückenfüller
+
+Listen aus FMInside (CSV, `;`, erste Spalte `UID`, eine Zeile je Spieler) kommen in den Ordner `fmdb` im Datenordner (`~/.local/share/fl-stats-converter/fmdb/` unter Linux; mehrere Dateien sind möglich, die spätere gewinnt je UID; die Listen gehören nicht in dieses Repository). Der Converter nutzt sie so:
+
+* **Fallback-Quelle:** Ein Spieler, den EA FC / SoFIFA nicht hat (kein Treffer), wird aus der Liste umgerechnet, wie eine eingefügte FMInside-Seite (mit der Kalibrierung unten). Ein unsicherer EA-Treffer wird nicht ersetzt, den wählst du wie bisher.
+* **Füllt, was EA FC nicht liefert:** die Positionen (FM *natural* = Stufe 2, *accomplished* = 1, zu den vorhandenen addiert, nie gesenkt), den **schwachen Fuß** (Häufigkeit und Genauigkeit, wird in die `Player.bin` geschrieben; FM 2 / 3 / 4 ergibt 2/2, 2/3, 3/3, an 51 Spielern des Spiels angepasst), bevorzugten Fuß und Größe, wo EA FC keine hat.
+* **Kalibrierung:** Die FM-Umrechnung wird je Attribut auf das Niveau der EA-FC-Umrechnung gebracht (Leave-one-out geprüft: der Abstand von etwa 5,5 Punkten sinkt mit 75 Spielern auf etwa 4,3; ausgeliefert sind 78 Proben mit 3 Torhütern, Torhüter haben eine eigene Anpassung). Eine Liste lässt sich im Feld *FM-Kalibrierung* wie Seitentext einfügen und liefert weitere Proben.
+
 ## Änderungen ins laufende Spiel laden (PESM-LivePatch, ohne Neustart)
 
 Schreibt der Converter `Player.bin` (Attribute) oder eine Aufstellung, legt er kleine Patch-Dateien in `<Sider>/content/pesm-livepatch/` ab und bringt das Sider-Modul

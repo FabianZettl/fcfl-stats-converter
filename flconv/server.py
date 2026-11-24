@@ -25,6 +25,7 @@ import playstyle  # noqa: E402
 import collections  # noqa: E402
 import timeshift  # noqa: E402
 import dbmeta  # noqa: E402
+import fmdb  # noqa: E402
 import livepatch  # noqa: E402
 import fcdb  # noqa: E402
 import fmcal  # noqa: E402
@@ -397,6 +398,26 @@ def paste_take():
     return p
 
 
+FML = dict(l=None, t=0)
+
+
+def fm_list():
+    """the FM lists (folders <data dir>/fmdb and flconv/data/fmdb), looked at again every 10 seconds so that a new file is found without a restart"""
+    if FML['l'] is None or time.time() - FML['t'] > 10:
+        folders = [os.path.join(DATA, 'fmdb'), os.path.join(HERE, 'data', 'fmdb')]
+        sig = [(f, os.path.getmtime(f), len(os.listdir(f))) for f in folders if os.path.isdir(f)]
+        if FML['l'] is None or FML.get('sig') != sig:
+            FML.update(l=fmdb.FMList(folders), sig=sig)
+        FML['t'] = time.time()
+    return FML['l']
+
+
+def fm_row(pid):
+    """the row of the FM list for a player of the database, or None"""
+    l = fm_list()
+    return l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid)) if len(l) else None
+
+
 def club_name(pid):
     ls = live_squads()
     return M.team.get((ls[1].get(pid) if ls and pid in ls[1] else M.club_of.get(pid)), '')
@@ -518,10 +539,13 @@ YF = dict(youth=True, profile=True, skills='off', psboost=False)   # setting of 
 
 def sig_of(pid, src, youth):
     """what a conversion depends on: the EA FC player found, the youth bonus and the development period (in quarters). Pages (FMInside / SoFIFA) have no signature: only the values count."""
-    if src not in ('EA FC', 'scaled'):
+    if src not in ('EA FC', 'scaled', 'FM list'):
         return 'page'
     m = match(pid)
     sid = m['row']['id'] if src == 'EA FC' and m['status'] == 'ok' else src
+    if src == 'FM list':   # the row of the list and its values: a new export of the list converts the player again
+        fr = fm_row(pid)
+        sid = 'FM%s|%s' % (fr['UID'], sorted(fmdb.raw(fr).items())) if fr else src
     return hashlib.md5(('%s|%d|%d|p%d|s%d' % (sid, int(bool(youth)), int(months() // 3), int(YF.get('profile', True)), {'off': 0, 'add': 1, 'replace': 2}.get(YF.get('skills'), 0) + 4 * int(bool(YF.get('psboost')))) + '|f%s' % sorted((form_attr(pid) or {}).items()) + '|d%.2f' % form_dev(pid)).encode()).hexdigest()[:10]
 
 
@@ -541,7 +565,7 @@ def unchanged(pid, cur, youth, jn):
     if not j or not j.get('sig') or not near(cur, j):
         return False
     ok = match(pid)['status'] == 'ok'
-    if (j['src'] == 'scaled' and ok) or (j['src'] == 'EA FC' and not ok):   # EA FC found / lost since
+    if (j['src'] in ('scaled', 'FM list') and ok) or (j['src'] == 'EA FC' and not ok):   # EA FC found / lost since
         return False
     return j['sig'] == sig_of(pid, j['src'], youth)
 
@@ -565,7 +589,7 @@ def is_done(pid, youth=True):
         except Exception:
             pass
         return None, bool(j)
-    if j and j.get('src') in ('FMInside', 'SoFIFA', 'scaled'):
+    if j and j.get('src') in ('FMInside', 'SoFIFA', 'scaled', 'FM list'):
         same = j.get('h') == ahash(cur) or j.get('attrs') == cur
         return ('scaled to EA level' if j['src'] == 'scaled' else j['src'], False) if same else (None, True)
     return None, bool(j)
@@ -590,7 +614,7 @@ PROFILE_FIELDS = ('height', 'weight', 'foot')
 PROFILE_RANGE = dict(height=(140, 230), weight=(40, 140))
 
 
-def profile_for(pid, row, edits=None):
+def profile_for(pid, row, edits=None, fmr=None):
     """height, weight and preferred foot: what the database has now and what the EA FC entry (or your own edit) says -> {field: {cur, new, src}}; only fields that have a value"""
     pb = M.pb
     i = pb.index[pid]
@@ -608,6 +632,9 @@ def profile_for(pid, row, edits=None):
                 except (TypeError, ValueError):
                     new = None
             src = 'EA FC' if new is not None else None
+        if new is None and fmr is not None and f in ('height', 'foot'):   # what EA FC does not give: the FM list
+            new = fmdb.height(fmr) if f == 'height' else fmdb.foot(fmr)
+            src = 'FMInside' if new is not None else None
         ed = (edits or {}).get(f)
         if ed not in (None, ''):
             if f == 'foot':
@@ -618,6 +645,9 @@ def profile_for(pid, row, edits=None):
             src = 'you'
         if new is not None:
             out[f] = dict(cur=cur[f], new=new, src=src)
+    wf = fmdb.weak_foot(fmr) if fmr is not None else None   # weak foot: EA FC data is not used for it, the FM list is
+    if wf:
+        out['weak_foot'] = dict(cur=(pb.weak_foot_use(i), pb.weak_foot_acc(i)), new=wf, src='FMInside')
     return out
 
 
@@ -704,7 +734,7 @@ def unfilled(pid):
     return not pb.skills(i) and not pb.com_styles(i) and pb.playing_style(i) == 'Balanced'
 
 
-def positions_for(pid, final, row=None, paste=False):
+def positions_for(pid, final, row=None, paste=False, fmr=None):
     """positions that the values make safe, added to the ones the player has (never lowered) -> {'cur', 'new', 'add'} or None. For a player of the EA FC data only the alternative
     positions of EA FC count (confirmed by the values); a player with an empty profile or a pasted page gets them from the values and his position."""
     pb = M.pb
@@ -716,6 +746,10 @@ def positions_for(pid, final, row=None, paste=False):
     elif paste or unfilled(pid):
         prop = playstyle.positions_from_values(final, pos_of(pid))
     else:
+        prop = [0] * 13
+    if fmr is not None:   # what EA FC does not say: the position ratings of the FM list (natural 2, accomplished 1) are added
+        prop = [max(a, b) for a, b in zip(prop, fmdb.positions(fmr))]
+    if not any(prop):
         return None
     new = [max(a, b) for a, b in zip(cur, prop)]
     if new == cur:
@@ -846,6 +880,10 @@ def preview(body):
     i = M.pb.index[pid]
     fm = body.get('fm') or None
     row = None if fm else row_for(pid, body.get('db_id'))
+    fmr = fm_row(pid)
+    from_list = False
+    if not fm and row is None and fmr is not None and match(pid)['status'] == 'none':   # no EA FC / SoFIFA data (an uncertain match is not 'none': the user chooses): the FM list is the fallback, converted like a pasted FMInside page
+        fm, from_list = fmdb.page_text(fmr), True
     if not fm and row is None:
         m = match(pid)
         return dict(ok=False, status=m['status'], msg='Not found in the database.' if m['status'] == 'none' else 'Several players or an uncertain match: choose one.',
@@ -888,12 +926,14 @@ def preview(body):
         p['names'] = {f: M.pb.get_name(i, f) for f in ('name', 'shirt', 'nshirt')}
         if row and not fm:
             p['names_ea'] = ea_names(row)
-        p['profile'] = profile_for(pid, row if not fm else None, body.get('pedits'))
+        p['profile'] = profile_for(pid, row if not fm else None, body.get('pedits'), fmr)
+        if from_list:
+            p['source'], p['fm_list'] = 'FM list', True
         mode = body.get('skills', 'off')
         has_ps = bool(row and not fm and playstyle.parse(row['raw'].get('playstyles')))
         p['skillset'] = skillset_for(pid, row if not fm else None, mode) if has_ps else values_traits_for(pid, p['final'], mode, row, paste=bool(fm))
         if mode in ('add', 'replace'):
-            pz = positions_for(pid, p['final'], row if not fm else None, paste=bool(fm))
+            pz = positions_for(pid, p['final'], row if not fm else None, paste=bool(fm), fmr=fmr)
             if pz:
                 p['skillset']['positions'] = pz
         p['pos_ovr'] = {k: int(round(convert.ovr_model(p['final'], k))) for k in range(13)}
@@ -1332,11 +1372,11 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
             i = pb.index[pid]
             cur = cur_attrs(pid)
             same = unchanged(pid, cur, youth, jn)
-            if same and (not (profile or skills != 'off') or jn[str(pid)]['src'] != 'EA FC'):
+            if same and (not (profile or skills != 'off') or jn[str(pid)]['src'] not in ('EA FC', 'FM list')):
                 cnt['already'] += 1
                 continue
             m = match(pid)
-            if m['status'] == 'ok':
+            if m['status'] == 'ok' or (m['status'] == 'none' and fm_row(pid) is not None):   # EA FC, else the FM list (preview takes it as the fallback)
                 p = preview(dict(pid=pid, youth=youth, skills=skills, psboost=psboost))
                 if not p.get('ok'):
                     cnt['failed'] += 1
@@ -1354,9 +1394,10 @@ def bulk_job(rest, youth, dry, profile=True, skills='off', psboost=False):
                     profs[pid] = pr
                     cnt['profile'] += 1
                 if p['final'] != cur:
-                    writes[pid], srcs[pid] = p['final'], 'EA FC'   # (the file only changes where values differ; the running game gets only the differences, see ml_write)
+                    writes[pid], srcs[pid] = p['final'], p.get('source') or 'EA FC'   # (the file only changes where values differ; the running game gets only the differences, see ml_write)
                     chg_f.append(p['ovr_new'] - p['ovr_cur'])
                     cnt['converted'] += 1
+                    cnt['fm_list'] += p.get('source') == 'FM list'
             elif rest == 'scale':
                 j = jn.get(str(pid))
                 if j and j.get('src') == 'scaled' and j.get('h') == ahash(cur):
