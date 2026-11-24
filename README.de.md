@@ -7,6 +7,8 @@ mit **Backup vor jedem Schreiben**, Prüfung danach und Wiederherstellung per Kl
 Du gibst den Pfad zu deiner `Player.bin` an, das Tool vergleicht deine Datenbank mit den mitgelieferten EA-FC-Daten, zeigt jede Änderung
 (Attribut, alt → neu, mit Begründung) und bietet an, sie zu schreiben.
 
+Was sich in jedem Release geändert hat: [CHANGELOG.md](CHANGELOG.md) (englisch).
+
 ## Was drin ist
 
 * **Aktive Datenbank mit EA-FC-Werten aktualisieren** – der Hauptzweck. Liga, Verein, Spieler oder die ganze Datenbank, automatisch in den mitgelieferten EA-FC-Daten gefunden.

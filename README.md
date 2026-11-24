@@ -9,6 +9,8 @@ shows what would change (every attribute, old → new, with the reason) and offe
 
 > Deutsche Anleitung: [README.de.md](README.de.md)
 
+See [CHANGELOG.md](CHANGELOG.md) for what changed in every release.
+
 ## What is in it
 
 * **Update the active database with EA FC stats** – the main purpose. League, club, player or the whole database, found automatically in the EA FC data that comes with the tool.
