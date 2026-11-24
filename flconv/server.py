@@ -1830,7 +1830,7 @@ class H(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b)
             elif u.path == '/api/init':
-                self.send_json(dict(ok=True, pesdb=CFG['pesdb'], loaded=M is not None, players=M.pb.n if M else 0, ea=len(EA.rows), csv=os.path.basename(CFG['csv']),
+                self.send_json(dict(ok=True, pesdb=CFG['pesdb'], loaded=M is not None, players=M.pb.n if M else 0, ea=len(EA.rows), csv=os.path.basename(CFG['csv']), fm=len(fm_list()), fm_values=sum(1 for r in fm_list().rows.values() if fmdb.complete(r)),
                                     leagues=[dict(id=c, name=L['name'], n=len(L['teams'])) for c, L in sorted(M.leagues.items(), key=lambda kv: kv[1]['name'])] if M else [], backups=backups()))
             elif u.path == '/api/fs':
                 self.send_json(fs_list((q.get('path') or [''])[0], (q.get('kind') or [''])[0]))

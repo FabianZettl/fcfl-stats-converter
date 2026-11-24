@@ -115,7 +115,7 @@ $('#gsr').addEventListener('click',async e=>{const i=e.target.closest('.gsi');if
   if(i.dataset.t){const lg=$('#lg');if(lg.value!==i.dataset.l){lg.value=i.dataset.l;lg.dispatchEvent(new Event('change'));await new Promise(r=>{const t=setInterval(()=>{if(document.querySelector('.cl')){clearInterval(t);r()}},100)})}openClub(+i.dataset.t)}
   else if(i.dataset.p)openPlayer(+i.dataset.p)});
 document.addEventListener('click',e=>{if(!e.target.closest('#gs,#gsr'))$('#gsr').style.display='none'});
-async function init(){const r=await api('/api/init');LG=r.leagues;$('#info').innerHTML=r.players.toLocaleString()+' players in the database<br>'+r.ea.toLocaleString()+' players in '+E(r.csv);
+async function init(){const r=await api('/api/init');LG=r.leagues;$('#info').innerHTML=r.players.toLocaleString()+' players in the database<br>'+r.ea.toLocaleString()+' players in '+E(r.csv)+'<br>'+r.fm.toLocaleString()+' players in the FM database'+(r.fm?' ('+r.fm_values.toLocaleString()+' with all values)':'');
   $('#lg').innerHTML='<option value="">Choose a league …</option>'+LG.map(l=>'<option value="'+l.id+'">'+E(l.name)+' ('+l.n+')</option>').join('');  lpCheck()}
 async function lpCheck(){const r=await api('/api/livepatch');if(!r.ok||r.state!=='ask'||r.hidden||$('#lpB'))return;
   document.body.insertAdjacentHTML('beforeend','<div id="lpB" class="msg ok" style="position:fixed;right:18px;bottom:18px;max-width:440px;z-index:60;background:var(--surface);box-shadow:0 6px 24px #0008"><b>New: load changes into the running game</b>'
