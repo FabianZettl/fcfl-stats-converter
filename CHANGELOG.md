@@ -5,6 +5,7 @@ Releases of FCFL - Stats Converter, newest first. (`CHANGES.md` lists what is di
 ## v0.7.2 - (not released yet)
 * **FM list assignment** uses the nationality of the player (Player.bin bit 233) next to club, age and height; the PES nation numbers are turned into country names from confident matches. 96 % of the 10,700 assigned players have the same nation in the FM list.
 * **Players that only the FM list has** get the same player page as those of EA FC: full name, nation, date of birth, FM ability and potential instead of the EA FC rating, FM roles instead of the PlayStyles, weak foot with the FM value; the overall steps say "FM values".
+* **Source tab on every player page**: *EA FC values* | *FM values* for a player that both sources have. The choice is remembered with the player (`source-<db>.json` in the data folder), so later runs over a club or the database keep it.
 
 ## v0.7.1 - 2026-11-24
 * **New FM list**: 11,000 players, 8,500 with every attribute, all with position ratings. FM calibration from 6,000 players (held out: field players 5.7 -> 4.4, keepers 5.6 -> 1.7).

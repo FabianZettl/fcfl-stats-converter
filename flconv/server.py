@@ -360,6 +360,11 @@ def load():
     MATCH.clear()
     ASSIGN.clear()
     ASSIGN.update(assign_load())
+    SRC.clear()
+    try:
+        SRC.update(json.load(open(src_file(), encoding='utf-8')))
+    except (OSError, ValueError):
+        pass
     form_load()
 
 
@@ -524,6 +529,22 @@ def assign_load():
 
 
 ASSIGN = {}   # pid -> EA FC id chosen by the user; kept, so that the player is found again without asking
+SRC = {}   # pid -> 'fm': the user converts this player from the FM list although EA FC has him (the tab on the player page); kept like the assignment
+
+
+def src_file():
+    return os.path.join(DATA, 'source-%s.json' % db_key())
+
+
+def src_set(pid, v):
+    if v == 'fm':
+        SRC[str(pid)] = 'fm'
+    else:
+        SRC.pop(str(pid), None)
+    os.makedirs(DATA, exist_ok=True)
+    json.dump(SRC, open(src_file(), 'w'), indent=0)
+
+
 
 
 def assign_set(pid, db_id):
@@ -610,7 +631,7 @@ def unchanged(pid, cur, youth, jn):
     if not j or not j.get('sig') or not near(cur, j):
         return False
     ok = match(pid)['status'] == 'ok'
-    if (j['src'] in ('scaled', 'FM list') and ok) or (j['src'] == 'EA FC' and not ok):   # EA FC found / lost since
+    if (j['src'] == 'scaled' and ok) or (j['src'] == 'FM list' and ok and SRC.get(str(pid)) != 'fm') or (j['src'] == 'EA FC' and not ok):   # EA FC found / lost since (an FM list player is kept if the user chose it)
         return False
     return j['sig'] == sig_of(pid, j['src'], youth)
 
@@ -934,9 +955,14 @@ def preview(body):
     pid = int(body['pid'])
     i = M.pb.index[pid]
     fm = body.get('fm') or None
-    row = None if fm else row_for(pid, body.get('db_id'))
+    ea_row = None if fm else row_for(pid, body.get('db_id'))
+    row = ea_row
     fmr = fm_row(pid)
+    fm_ok = fmr is not None and fmdb.complete(fmr)
     from_list = False
+    want = body.get('source') or SRC.get(str(pid))   # the tab of the player page / what the user chose for this player before
+    if want == 'fm' and not fm and fm_ok:   # EA FC has him, but the user wants the FM values
+        fm, row, from_list = fmdb.page_text(fmr), None, True
     if not fm and row is None and fmr is not None and fmdb.complete(fmr) and match(pid)['status'] == 'none':   # no EA FC / SoFIFA data (an uncertain match is not 'none': the user chooses): the FM list is the fallback, converted like a pasted FMInside page
         fm, from_list = fmdb.page_text(fmr), True
     if not fm and row is None:
@@ -984,6 +1010,7 @@ def preview(body):
         p['profile'] = profile_for(pid, row if not fm else None, body.get('pedits'), fmr)
         if from_list:
             p['source'], p['fm_list'] = 'FM list', True
+        p['sources'] = dict(ea=ea_row is not None, fm=fm_ok, active='fm' if from_list else 'ea' if row is not None else 'page')
         mode = body.get('skills', 'off')
         has_ps = bool(row and not fm and playstyle.parse(row['raw'].get('playstyles')))
         p['skillset'] = skillset_for(pid, row if not fm else None, mode) if has_ps else values_traits_for(pid, p['final'], mode, row, paste=bool(fm))
@@ -1043,7 +1070,7 @@ def apply(body):
             report.append(dict(pid=pid, name=M.name.get(pid), ok=False, msg='already converted', skipped=True))
             continue
         try:
-            p = preview(dict(pid=pid, db_id=ch.get('db_id'), fm=ch.get('fm'), target=ch.get('target'), edits=ch.get('edits'), pedits=ch.get('pedits'), skills=YF['skills'], psboost=YF['psboost'], youth=body.get('youth', True)))
+            p = preview(dict(pid=pid, db_id=ch.get('db_id'), fm=ch.get('fm'), source=ch.get('source'), target=ch.get('target'), edits=ch.get('edits'), pedits=ch.get('pedits'), skills=YF['skills'], psboost=YF['psboost'], youth=body.get('youth', True)))
         except Exception as ex:
             p = dict(ok=False, msg=str(ex))
         if not p.get('ok'):
@@ -1081,6 +1108,10 @@ def apply(body):
     if dry or not (writes or names or profs):
         return dict(ok=True, dry=True, report=report, written=0, profile=len(profs), skills=sk_n, form=fm_n)
     r = commit(writes, srcs, names, profs)
+    if r.get('ok'):
+        for pid, ch in choices.items():   # the source the user chose on the tab is remembered for this player
+            if ch.get('source') in ('ea', 'fm') and (pid in writes or pid in profs):
+                src_set(pid, ch['source'])
     if SET['mode'] == 'ml' and names:
         r['skipped'] = dict(names=len(names))   # names, height, weight and foot are not written into the running game
     return dict(r, report=report, dry=False, mode=SET['mode'])

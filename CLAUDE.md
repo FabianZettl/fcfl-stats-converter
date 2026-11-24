@@ -43,6 +43,8 @@ Run: `./start.sh` (stdlib `http.server`, default port 8790, UI in `flconv/static
 
 * New list from the scraper: `python3 tools/update_fm_list.py LIST.csv [--dry]` (copies it to `flconv/data/fmdb/` and the data dir, adds it to the calibration with a backup, reports the hold-out error, writes the thinned shipped calibration); then tests, commit, push.
 
+* Source tab: the player page has *EA FC values | FM values* when both sources exist (`p['sources']`, preview param `source`); the choice made in a write is kept in `SRC` (`source-<db>.json`), `unchanged()` does not treat a kept FM player as 'EA found since'.
+
 ## Live loading into the running game (PESM-LivePatch)
 * `flconv/livepatch.py` (stdlib only, PESM uses a copy) writes `<Sider>/content/pesm-livepatch/players.txt|teams.txt` after every database write (`server.live_after`); the Sider module `flconv/data/pesm-livepatch.lua` (F7 in the overlay) writes them into the game's memory. Files are NOT in memory as images: the game converts them (player table = 380 byte blocks, teams = 1680 byte objects in the order of Team.bin: squad 40 x (pid,u32) at +0, shirt numbers u16 at +330, formations 99 byte at +784/+944). Found with `tools/dev/` (needle search, memory dump); line-up swaps for two clubs verified in the game.
 * Live (attributes confirmed in the game 2026-11-23): 25 attributes, line-up, shirt numbers, formations. Restart needed: skills/COM/positions/style/body, names, transfers. Not live-patched: Competition/CompetitionEntry (not needed).
