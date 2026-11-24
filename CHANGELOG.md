@@ -2,6 +2,9 @@
 
 Releases of FCFL - Stats Converter, newest first. (`CHANGES.md` lists what is different from the PES Stats Converter this tool started from.)
 
+## v0.7.5 - (not released yet)
+* FM list of 61,000 players (27,700 with every attribute); FM calibration from 11,400 players: field players 5.8 -> 4.3, keepers 5.7 -> 1.9.
+
 ## v0.7.4 - 2026-11-24
 * **"Values are as of" can be changed** in the settings (it was fixed to 01.09.2026). Automatic = the date of the standard database or of the newest update that brought something (24.11.2026 now); a typed date overrides it, *Automatic* takes it back. The development to the write date and the age of the players count from it.
 * FM list of 33,000 players (19,800 with every attribute); FM calibration from 10,400 players: field players 5.8 -> 4.3, keepers 5.7 -> 1.9.
