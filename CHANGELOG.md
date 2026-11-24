@@ -2,12 +2,15 @@
 
 Releases of FCFL - Stats Converter, newest first. (`CHANGES.md` lists what is different from the PES Stats Converter this tool started from.)
 
+## v0.7.4 - (not released yet)
+* **Only the date decides** which row of a SoFIFA update counts. v0.7.3 ranked the updates by the number in the file name; that number is only a counter of the scraper. The standard database (`sofifa-base-2026-11-24.csv`) has the state of 24 Nov 2026: an update dated before or on that day changes nothing and brings back no player the base lacks; a later one is laid over by date, whatever its number is.
+
 ## v0.7.3 - 2026-11-24
 * **SoFIFA updates in the German export**: the numbers of an update carry the change ('70+1', '66-1'); they were not read, so 40-50 % of the rows of every update file were dropped. Now they are read.
 * **The roster version decides before the date**: an update of an older roster never beats the standard database (roster 270008) and does not bring back a player that the newer roster does not have; a newer roster (270009 and on) wins. Ties between an update and the standard database go to the standard database.
 
 ## v0.7.2 - 2026-11-24
-* **New standard database**: the German SoFIFA export of all players (`sofifa-base-270008-2026-11-18.csv`, 19,594 players with potential, PlayStyles, growth profile, contracts, loans, values) replaces the EA FC 27 data set; updates follow as CSV files. Players converted from the old database show *convert again* once. An entry with holes in the attributes lets a complete FM row take over. The FM list has 22,000 players (14,900 with every attribute); the FM calibration (8,900 players, keepers apart) is redone against the new base: field players 5.7 -> 4.3, keepers 5.7 -> 1.9.
+* **New standard database**: the German SoFIFA export of all players (`sofifa-base-2026-11-24.csv`, 19,594 players with potential, PlayStyles, growth profile, contracts, loans, values) replaces the EA FC 27 data set; updates follow as CSV files. Players converted from the old database show *convert again* once. An entry with holes in the attributes lets a complete FM row take over. The FM list has 22,000 players (14,900 with every attribute); the FM calibration (8,900 players, keepers apart) is redone against the new base: field players 5.7 -> 4.3, keepers 5.7 -> 1.9.
 * **FM list assignment** uses the nationality of the player (Player.bin bit 233) next to club, age and height; the PES nation numbers are turned into country names from confident matches. 96 % of the 10,700 assigned players have the same nation in the FM list.
 * **Players that only the FM list has** get the same player page as those of EA FC: full name, nation, date of birth, FM ability and potential instead of the EA FC rating, FM roles instead of the PlayStyles, weak foot with the FM value; the overall steps say "FM values".
 * **Source tab on every player page**: *EA FC values* | *FM values* for a player that both sources have. The choice is remembered with the player (`source-<db>.json` in the data folder), so later runs over a club or the database keep it.

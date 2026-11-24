@@ -1,12 +1,12 @@
 # Data
 
-`flconv/data/sofifa-base-270008-2026-11-18.csv` – the **German SoFIFA export of all players** (19,594 rows, snapshot 24 Nov 2026): rating, potential, the 34 attribute values, positions, height, weight, preferred and weak foot,
+`flconv/data/sofifa-base-2026-11-24.csv` – the **German SoFIFA export of all players** (19,594 rows, snapshot 24 Nov 2026): rating, potential, the 34 attribute values, positions, height, weight, preferred and weak foot,
 skill moves, PlayStyles (*Spielstile*, *Spielstile+*), growth profile, emotion, acceleration type, work rates, contract, loan, value, wage and release clause. It replaces the EA FC 27 data set (`fc27-players.csv`, an export of
 EA's public ratings page) that the tool used before; the PlayStyle names are translated with the table of EA FC 27 (`flconv/data/playstyles_de.json`, from the German and English EA pages).
 
 | Part | Source | License / note |
 |---|---|---|
-| All values of `sofifa-base-270008-2026-11-18.csv` | the player pages of sofifa.com, exported by the user's own tool and delivered as a CSV | The values are the facts shown on SoFIFA's public pages (they are the EA SPORTS FC values); SoFIFA and EA own the underlying data. |
+| All values of `sofifa-base-2026-11-24.csv` | the player pages of sofifa.com, exported by the user's own tool and delivered as a CSV | The values are the facts shown on SoFIFA's public pages (they are the EA SPORTS FC values); SoFIFA and EA own the underlying data. |
 | `playstyles_de.json` | the PlayStyle pages of EA SPORTS FC 27 (German and English) | Names only. |
 
 The data set is included because the tool needs it. If you are the owner of any of it and want it removed, open an issue and it will be taken out.

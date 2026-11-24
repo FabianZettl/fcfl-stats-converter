@@ -36,7 +36,7 @@ if not dry:
 work = cal if not dry else os.path.join(tempfile.mkdtemp(), 'fm_calib.json')
 if dry and os.path.isfile(cal):
     shutil.copy2(cal, work)
-EA = fcdb.load(os.path.join(HERE, '..', 'flconv', 'data', 'sofifa-base-270008-2026-11-18.csv'))
+EA = fcdb.load(os.path.join(HERE, '..', 'flconv', 'data', 'sofifa-base-2026-11-24.csv'))
 rep, S = fmcal.add(open(src, encoding='utf-8').read(), EA, work)
 print('matched:', dict(collections.Counter(('ok' if r['ok'] else r['msg']) for r in rep)))
 print('calibration: %d samples, %d keepers' % (len(S), sum(1 for s in S if s.get('gk'))))

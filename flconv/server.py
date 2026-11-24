@@ -46,7 +46,7 @@ DATA = default_data_dir()   # settings, backups, the copy of the original Player
 DEF = dict(
     pesdb='',
     plan='',
-    csv=os.path.join(HERE, 'data', 'sofifa-base-270008-2026-11-18.csv'),
+    csv=os.path.join(HERE, 'data', 'sofifa-base-2026-11-24.csv'),
     fmcal=os.path.join(DATA, 'fm_calib.json'),
     backups=os.path.join(DATA, 'backups'),
     journal=os.path.join(DATA, 'converted.json'),
@@ -607,7 +607,7 @@ def base_csv():
             continue
     if found:
         return max(found)[2]
-    shipped = sorted(glob.glob(os.path.join(HERE, 'data', 'sofifa-base*.csv')))   # the one that comes with the tool: sofifa-base-<roster>-<date>.csv, the newest name
+    shipped = sorted(glob.glob(os.path.join(HERE, 'data', 'sofifa-base*.csv')))   # the one that comes with the tool: sofifa-base-<date>.csv, the newest name
     return shipped[-1] if shipped else ''
 
 

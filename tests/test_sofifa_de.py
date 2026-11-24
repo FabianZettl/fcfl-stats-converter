@@ -54,22 +54,33 @@ assert len(set(tab.values()) - extra) == 36 and extra <= set(tab.values())
 assert 'Vereinstreue Spielerin' not in tab and 'Harte Flanke' not in tab   # not guessed
 print('ok')
 
-# the roster version (the number in the Link, e.g. .../270008/) decides before the date: an update of an older roster never beats the standard database, and it does not bring back a player that the
-# newer roster does not have; an update of a newer roster wins, whatever the dates say. Rating changes like '70+1' in an update are read as 70.
+# only the DATE counts (the number in the name of an update is a counter of the scraper, it means nothing): an update older than the standard database never beats it and does not bring back a player
+# that the standard database does not have; one with the same date does not beat it either; a newer one wins; a lower number with a newer date wins over a higher number with an older date.
+# Rating changes like '70+1' in an update are read as 70.
 rd = tempfile.mkdtemp()
 RH = 'ID;Name;Vollständiger Name;Nationalität;Positionen;Verein;Alter;Gesamtbewertung;Potenzial;Geburtsjahr;Größe;Gewicht;Starker Fuß;Link'
+
+
 def gfile(folder, name, rows):
     path = os.path.join(folder, name)
     open(path, 'w', encoding='utf-8-sig').write('\n'.join([RH] + rows) + '\n')
     return path
-gb2 = gfile(rd, 'sofifa-base-270008-2026-11-18.csv', ['1;A. Alpha;Anna Alpha;England;ST;Arsenal;27;80;82;2000;"180cm 5\'11""";70kg 154lbs;Rechts;https://sofifa.com/player/1/anna-alpha/270008/'])
+
+
+def prow(pid, first, rating):
+    return '%d;%s. X;%s X;England;ST;Arsenal;27;%s;82;2000;"180cm 5\'11""";70kg 154lbs;Rechts;https://sofifa.com/player/%d/x/270008/' % (pid, first[0], first, rating, pid)
+
+
+gb2 = gfile(rd, 'sofifa-base-2026-11-24.csv', [prow(1, 'Anna', 80)])
 ru = os.path.join(rd, 'u')
 os.makedirs(ru)
-gfile(ru, 'sofifa-updates-270005-2026-10-28.csv', ['1;A. Alpha;Anna Alpha;England;ST;Arsenal;27;70+1;82;2000;"180cm 5\'11""";70kg 154lbs;Rechts;https://sofifa.com/player/1/anna-alpha/270005/',
-                                                   '7;G. Gone;Gina Gone;England;ST;Arsenal;30;60-2;60;1996;"180cm 5\'11""";70kg 154lbs;Rechts;https://sofifa.com/player/7/gina-gone/270005/'])
-gfile(ru, 'sofifa-updates-270009-2026-11-25.csv', ['2;B. Beta;Bert Beta;England;ST;Arsenal;22;66;75;2004;"180cm 5\'11""";70kg 154lbs;Rechts;https://sofifa.com/player/2/bert-beta/270009/'])
+gfile(ru, 'sofifa-updates-270005-2026-10-28.csv', [prow(1, 'Anna', '70+1'), prow(7, 'Gina', '60-2')])          # older than the base: loses, and Gina stays out
+gfile(ru, 'sofifa-updates-270002-2026-11-24.csv', [prow(1, 'Anna', 77)])                                       # the same day as the base: the base keeps it
+gfile(ru, 'sofifa-updates-270009-2026-11-25.csv', [prow(1, 'Anna', 83), prow(2, 'Bert', 66)])                   # newer: wins, adds Bert
+gfile(ru, 'sofifa-updates-270001-2026-12-01.csv', [prow(1, 'Anna', 85)])                                       # a LOWER number but a newer date: wins over the one before
 g2 = {r['raw']['base_id']: r for r in fcdb.DB(gb2, fcdb.update_files(ru)).rows}
-assert g2['1']['rating'] == 80 and g2['1']['upd'] is None   # the older roster loses (70+1 was read as 70, not dropped)
-assert '7' not in g2                                         # a player of an older roster that the base does not have stays out
-assert g2['2']['rating'] == 66 and g2['2']['upd'] == 'sofifa-updates-270009-2026-11-25.csv'   # a newer roster adds and wins
+assert g2['1']['rating'] == 85 and g2['1']['upd'] == 'sofifa-updates-270001-2026-12-01.csv'
+assert '7' not in g2 and g2['2']['rating'] == 66
+only_old = {r['raw']['base_id']: r for r in fcdb.DB(gb2, [u for u in fcdb.update_files(ru) if u['date'] <= (2026, 11, 24)]).rows}
+assert only_old['1']['rating'] == 80 and only_old['1']['upd'] is None and '7' not in only_old   # older and same-day updates change nothing ('70+1' was read, not dropped)
 print('ok')
