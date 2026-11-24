@@ -2,7 +2,7 @@
 
 Releases of FCFL - Stats Converter, newest first. (`CHANGES.md` lists what is different from the PES Stats Converter this tool started from.)
 
-## v0.7.3 - (not released yet)
+## v0.7.3 - 2026-11-24
 * **SoFIFA updates in the German export**: the numbers of an update carry the change ('70+1', '66-1'); they were not read, so 40-50 % of the rows of every update file were dropped. Now they are read.
 * **The roster version decides before the date**: an update of an older roster never beats the standard database (roster 270008) and does not bring back a player that the newer roster does not have; a newer roster (270009 and on) wins. Ties between an update and the standard database go to the standard database.
 
