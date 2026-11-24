@@ -415,7 +415,8 @@ def fm_list():
 def fm_row(pid):
     """the row of the FM list for a player of the database, or None"""
     l = fm_list()
-    return l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid)) if len(l) else None
+    r = l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid)) if len(l) else None
+    return r if r is not None and fmdb.plausible(r, pos_of(pid)) else None   # a row that does not fit his position is another player
 
 
 def convertible(pid):
@@ -613,6 +614,11 @@ def pl_row(pid, youth=True):
     if m['status'] == 'ok':
         r = m['row']
         d['ea'] = dict(name=r['name'], club=r['club'], rating=r['rating'], why=m['why'])
+    fr = fm_row(pid)
+    if m['status'] == 'ok':   # where the values come from: EAFC; FM too when the FM list has position ratings / the weak foot of the player
+        d['found'] = 'EAFC & FM' if fr is not None and fmdb.detail(fr) else 'EAFC'
+    elif m['status'] == 'none' and fr is not None and fmdb.complete(fr):
+        d['found'] = 'FM'
     return d
 
 
@@ -746,26 +752,30 @@ def unfilled(pid):
 
 
 def positions_for(pid, final, row=None, paste=False, fmr=None):
-    """positions that the values make safe, added to the ones the player has (never lowered) -> {'cur', 'new', 'add'} or None. For a player of the EA FC data only the alternative
-    positions of EA FC count (confirmed by the values); a player with an empty profile or a pasted page gets them from the values and his position."""
+    """the positions the player can play -> {'cur', 'new', 'add', 'rem'} or None.
+    FM first (user's rule): a player with position ratings in the FM list gets exactly those (natural 2, accomplished 1, the rest 0; the second striker has no FM rating and stays as it is;
+    his main position stays at level 2, the position field of the database is not changed). Without FM ratings: EA FC (the alternative positions, confirmed by the values), for a
+    player with an empty profile or a pasted page from the values, added to what he has and never lowered."""
     pb = M.pb
     i = pb.index[pid]
     cur = pb.positions(i)
-    alt = [a for a in (row['alt'] if row else []) if a]
-    if alt:
-        prop = playstyle.positions_from_values(final, pos_of(pid), alt, only_alt=True)
-    elif paste or unfilled(pid):
-        prop = playstyle.positions_from_values(final, pos_of(pid))
+    if fmr is not None and fmdb.has_positions(fmr):
+        new = fmdb.positions(fmr)
+        new[11] = cur[11]
+        if pos_of(pid) < 13:
+            new[pos_of(pid)] = max(new[pos_of(pid)], 2)
     else:
-        prop = [0] * 13
-    if fmr is not None:   # what EA FC does not say: the position ratings of the FM list (natural 2, accomplished 1) are added
-        prop = [max(a, b) for a, b in zip(prop, fmdb.positions(fmr))]
-    if not any(prop):
-        return None
-    new = [max(a, b) for a, b in zip(cur, prop)]
+        alt = [a for a in (row['alt'] if row else []) if a]
+        if alt:
+            prop = playstyle.positions_from_values(final, pos_of(pid), alt, only_alt=True)
+        elif paste or unfilled(pid):
+            prop = playstyle.positions_from_values(final, pos_of(pid))
+        else:
+            return None
+        new = [max(a, b) for a, b in zip(cur, prop)]
     if new == cur:
         return None
-    return dict(cur=cur, new=new, add=[dbmeta.POS_NAMES[k] for k in range(13) if new[k] > cur[k]])
+    return dict(cur=cur, new=new, add=[dbmeta.POS_NAMES[k] for k in range(13) if new[k] > cur[k]], rem=[dbmeta.POS_NAMES[k] for k in range(13) if new[k] < cur[k]])
 
 
 def ea_names(row):
@@ -828,7 +838,7 @@ def club_view(tid, youth=True):
         fm = json.load(open(os.path.join(DATA, 'formations-%s.json' % db_key()))).get(str(tid))
     except Exception:
         fm = None
-    return dict(ok=True, tid=tid, formation=fm, layout=M.formation.get(tid), name=M.team.get(tid, ''), league=(M.leagues.get(M.league_of.get(tid)) or {}).get('name'), players=pl, found=sum(1 for x in pl if x['status'] == 'ok'), total=len(pl),
+    return dict(ok=True, tid=tid, formation=fm, layout=M.formation.get(tid), name=M.team.get(tid, ''), league=(M.leagues.get(M.league_of.get(tid)) or {}).get('name'), players=pl, found=sum(1 for x in pl if x.get('found')), total=len(pl),
                 done=sum(1 for x in pl if x.get('done')))
 
 
@@ -837,7 +847,7 @@ def league_view(cid):
     out = []
     for t in L['teams']:
         pids = squad_of(t)
-        out.append(dict(tid=t, name=M.team.get(t, ''), n=len(pids), found=sum(1 for p in pids if match(p)['status'] == 'ok')))
+        out.append(dict(tid=t, name=M.team.get(t, ''), n=len(pids), found=sum(1 for p in pids if convertible(p))))
     return dict(ok=True, id=cid, name=L['name'], clubs=out)
 
 

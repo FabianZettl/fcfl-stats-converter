@@ -79,6 +79,31 @@ def complete(r):
     return not sofifa.missing_fm(raw(r), (r.get('Positions') or '').strip().startswith('GK'))
 
 
+LINE_FM = {'GK': 0, 'DC': 1, 'DL': 1, 'DR': 1, 'WBL': 1.5, 'WBR': 1.5, 'DM': 1.5, 'MC': 2, 'ML': 2, 'MR': 2, 'AMC': 2.5, 'AML': 2.7, 'AMR': 2.7, 'ST': 3}   # lines of the pitch, back to front
+LINE_PES = (0, 1, 1, 1, 1.5, 2, 2, 2, 2.5, 2.7, 2.7, 3, 3)   # the same for the 13 positions of the game
+
+
+def plausible(r, main):
+    """the FM row can be the player of the database whose main position is `main` (index 0..12): a keeper is a keeper, otherwise one of his FM positions is within one line of it.
+    Catches a wrong match by name (the Brazilian Ronaldo of the database and a keeper called Ronaldo)"""
+    ls = [LINE_FM[t] for t in re.findall(r'[A-Z]+', r.get('Positions') or '') if t in LINE_FM]
+    if not ls or not 0 <= main < 13:
+        return True
+    if main == 0 or 0 in ls:
+        return main == 0 and 0 in ls
+    return any(abs(x - LINE_PES[main]) <= 1.0 for x in ls)
+
+
+def has_positions(r):
+    """the row has the position ratings (a detail row, not only a line of a list)"""
+    return any((r.get(col) or '').strip() for col, _ in POS_COLS)
+
+
+def detail(r):
+    """a detail row: it has position ratings or the weak foot (what the FM list adds to an EA FC player)"""
+    return has_positions(r) or bool(_int(r.get('Weak foot')))
+
+
 def positions(r):
     """13 levels 0/1/2 from the position ratings (natural 2, accomplished 1)"""
     out = [0] * 13

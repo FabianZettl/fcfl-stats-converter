@@ -44,4 +44,10 @@ assert fmdb.weak_foot(mb) == (3, 3) and fmdb.weak_foot(dict(mb, **{'Weak foot': 
 assert fmdb.foot(mb) == 'Right' and fmdb.foot(dict(mb, Footedness='Either')) is None and fmdb.height(mb) == 178 and fmdb.height(dict(mb, Height='99 CM')) is None
 assert fmdb.complete(mb) and not fmdb.complete(dict(mb, Pace=''))   # a row without all attributes is no source of values
 assert not fmdb.complete(dict(UID='9', Name='X', Positions='ST', **{'Ability (0-99)': '80'}))
+assert fmdb.has_positions(mb) and fmdb.detail(mb)
+listrow = dict(UID='9', Name='X', Positions='ST')
+assert not fmdb.has_positions(listrow) and not fmdb.detail(listrow) and fmdb.detail(dict(listrow, **{'Weak foot': '3'}))   # a line of a list has nothing to add to an EA FC player
+assert fmdb.plausible(mb, 12) and fmdb.plausible(mb, 9) and fmdb.plausible(mb, 8)   # AML, ST: a striker, a left winger, an attacking midfielder fit
+assert not fmdb.plausible(mb, 0) and not fmdb.plausible(mb, 1) and not fmdb.plausible(dict(mb, Positions='GK'), 12) and fmdb.plausible(dict(mb, Positions='GK'), 0)
+assert fmdb.plausible(dict(mb, Positions=''), 1)   # nothing to judge by
 print('ok')
