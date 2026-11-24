@@ -701,7 +701,11 @@ def sig_of(pid, src, youth):
 
 
 def jentry(pid, src, att):
-    return dict(src=src, when=time.strftime('%Y-%m-%d %H:%M'), h=ahash(att), sig=sig_of(pid, src, YF['youth']), a=[att[x] for x in plbin.AB])
+    e = dict(src=src, when=time.strftime('%Y-%m-%d %H:%M'), h=ahash(att), sig=sig_of(pid, src, YF['youth']), a=[att[x] for x in plbin.AB])
+    m = match(pid) if src == 'EA FC' else None
+    if m and m['status'] == 'ok' and m['row'].get('potential'):
+        e['pot'] = m['row']['potential']   # the potential (EA FC scale) is kept with the player: it is not a field of Player.bin, the youth bonus still has it when the export changes
+    return e
 
 
 def near(cur, j, tol=3):
@@ -1021,6 +1025,7 @@ def youth_bonus(pid, rating, pot=None, growth=None):
     f = YOUTH.get(age, 0.0 if age and age > 22 else (1.0 if age else 0.0))
     if not rating:
         return 0
+    pot = pot or (journal().get(str(pid)) or {}).get('pot')   # the one kept when the player was written
     if pot:   # potential on the EA FC scale (SoFIFA page or the data)
         gap = pot - rating
     else:     # potential of the game (Master League, via Gaffer; its scale is about 4 above EA FC); none known: no bonus

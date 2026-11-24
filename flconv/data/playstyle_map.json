@@ -1,5 +1,5 @@
 {
- "_doc": "EA FC PlayStyle -> skills and COM playing styles of PES 21 (own proposal, see docs/PLAYSTYLE_MAPPING.md). 'plus' = additionally for the PlayStyle+ version. Skills without a known bit in Player.bin (Knuckle Shot, Rabona, No Look Pass, Super-sub, GK Penalty Saver) are left out.",
+ "_doc": "EA FC PlayStyle -> skills and COM playing styles of PES 21 (own proposal, see docs/PLAYSTYLE_MAPPING.md). 'plus' = additionally for the PlayStyle+ version. Leadership (Führungsstärke), Long Shot Taker (Distanzsch. (CPU-KI)) and Early Crosser (Frühes Flanken (CPU-KI)) are traits of the German SoFIFA export that the user mapped (2026-11-24). Skills without a known bit in Player.bin (Knuckle Shot, Rabona, No Look Pass, Super-sub, GK Penalty Saver) are left out.",
  "skills": {
   "Acrobatic": {
    "skills": [
@@ -206,6 +206,24 @@
    ],
    "direct": [
     "GK Long Throw"
+   ]
+  },
+  "Leadership": {
+   "skills": [
+    "Captaincy"
+   ],
+   "direct": [
+    "Captaincy"
+   ]
+  },
+  "Long Shot Taker": {
+   "com": [
+    "Long Ranger"
+   ]
+  },
+  "Early Crosser": {
+   "com": [
+    "Early Cross"
    ]
   }
  },

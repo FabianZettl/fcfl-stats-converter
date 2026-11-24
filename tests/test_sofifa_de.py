@@ -48,5 +48,7 @@ assert gb.rows[0]['raw']['contract'] == '31.12.2026 River Plate' and gb.rows[0][
 import json
 tab = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'flconv', 'data', 'playstyles_de.json')))['map']
 assert {'Powerschuss': 'Power Shot', 'Harter Pass': 'Whipped Pass', 'Schnittstellenpass': 'Pinged Pass', 'Durchsetzungskraft': 'Enforcer', 'Zumachen': '1v1 Close Down'}.items() <= tab.items()
-assert len(set(tab.values()) - {'Rush Out'}) == 36
+extra = {'Rush Out', 'Trivela', 'Flair', 'Power Header', 'Aerial', 'Leadership', 'Long Shot Taker', 'Early Crosser'}   # older names and the traits the user mapped
+assert len(set(tab.values()) - extra) == 36 and extra <= set(tab.values())
+assert 'Vereinstreue Spielerin' not in tab and 'Harte Flanke' not in tab   # not guessed
 print('ok')

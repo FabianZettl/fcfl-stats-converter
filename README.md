@@ -58,10 +58,10 @@ Settings, backups and the copy of your original `Player.bin` are kept in `~/.loc
 
 The standard database can be the **German SoFIFA export of all players** (`sofifa-alle-2026-11-24.csv`: `ID;Name;Vollständiger Name;…;Spielstile;Spielstile+;Antritts-Typ;Emotion;Growth profile;…`). Put it into the folder `ea-base` of the data folder: the newest file there (by the date in its name) is the base, no restart. The converter reads from it, besides the 34 attribute values, rating and **potential**:
 
-* **PlayStyles** (*Spielstile* and *Spielstile+*) translated with the table of EA FC 27 (`flconv/data/playstyles_de.json`, 36 PlayStyles; *Harter Pass* = Whipped Pass, *Schnittstellenpass* = Pinged Pass, *Durchsetzungskraft* = Enforcer, …); a name that is not in the table is never guessed, it is left out and reported.
+* **PlayStyles** (*Spielstile* and *Spielstile+*) translated with the table of EA FC 27 (`flconv/data/playstyles_de.json`, 36 PlayStyles; *Harter Pass* = Whipped Pass, *Schnittstellenpass* = Pinged Pass, *Durchsetzungskraft* = Enforcer, …); a name that is not in the table is never guessed, it is left out and reported. Answered by you: *Trivela*, *Flair*, *Power-Kopfball* (Power Header), *In der Luft* (Aerial) and *1-gg-1 Zumachen* are mapped; *Führungsstärke* gives the skill Captaincy; the CPU AI traits *Distanzsch.* / *Frühes Flanken* give the COM styles Long Ranger / Early Cross when the values fit; *Vereinstreue Spielerin*, *Teamspielerin*, *Zuverlässigkeit*, *Anfällig für Verletzungen* and *Harte Flanke* stay out.
 * **Growth profile**: it scales the youth bonus (Explosive Start x1.3, Meteoric Peak x1.15, Late Bloomer x0.7, the rest x1.0); with the potential of the new base every young player has a bonus, not only those the old export had a potential for.
 * **Emotion**, **acceleration type** (*Antritts-Typ*), work rates, contract, **loan** (*Leihe*: the club he belongs to, until when), value, wage, release clause: shown on the player page (value and wage as tiles). A loaned player is also found by the club he belongs to.
-* The potential is not a field of `Player.bin` (no bit of the 312 byte record follows it: the best correlation is the age); it is used for the youth bonus and shown.
+* The potential is not a field of `Player.bin` (no bit of the 312 byte record follows it: the best correlation is the age). It stays in the tool: it is used for the youth bonus, shown, and kept in the journal with every player that is written.
 
 ## SoFIFA updates (new player values, loaded live)
 

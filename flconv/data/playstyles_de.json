@@ -1,5 +1,5 @@
 {
- "_doc": "German SoFIFA / EA FC 27 PlayStyle name -> English name (the list of the EA pages, checked against 2,000 players that have both). A PlayStyle+ is the name with '+' behind. Names of the older games and spelling variants of the export are listed too. Names that are not here are NOT guessed: they are reported (see fcdb.ps_unknown).",
+ "_doc": "German SoFIFA / EA FC 27 PlayStyle name -> English name (the list of the EA pages, checked against 2,000 players that have both). A PlayStyle+ is the name with '+' behind. Names of the older games and spelling variants of the export are listed too. Names that are not here are NOT guessed: they are reported (see fcdb.PS_UNKNOWN). Answered by the user (2026-11-24): Trivela / Flair / Power-Kopfball / In der Luft / 1-gg-1 Zumachen as listed; Führungsstärke = Leadership (gives the skill Captaincy); the two CPU-KI traits give the COM styles Long Ranger / Early Cross when the values fit; Vereinstreue Spielerin, Teamspielerin, Zuverlässigkeit, Anfällig für Verletzungen and Harte Flanke stay out.",
  "map": {
   "Akrobatisch": "Acrobatic", "Lupfer": "Chip Shot", "Ruhender Ball": "Dead Ball", "Angeschnittener Schuss": "Finesse Shot", "Angeschn. Schuss": "Finesse Shot",
   "Gamechanger": "Gamechanger", "Flacher Vollspannschuss": "Low Driven Shot", "Powerschuss": "Power Shot", "Präziser Kopfball": "Precision Header",
@@ -8,6 +8,8 @@
   "Kopfballmacht": "Aerial Fortress", "Antizipation": "Anticipate", "Block": "Block", "Abfangen": "Intercept", "Abdrängen": "Jockey", "Grätsche": "Slide Tackle",
   "Kante": "Bruiser", "Durchsetzungskraft": "Enforcer", "Durchsetzungs-Kraft": "Enforcer", "Langer Einwurf": "Long Throw", "Schneller Schritt": "Quick Step", "Unerbittlich": "Relentless",
   "Zumachen": "1v1 Close Down", "Flankenfang": "Cross Claimer", "Fingerspitzen": "Deflector", "Große Reichweite": "Far Reach", "Weiter Abwurf": "Far Throw", "Beinarbeit": "Footwork",
-  "Herauskommen": "Rush Out"
+  "Herauskommen": "Rush Out",
+  "1-gg-1 Zumachen": "1v1 Close Down", "Trivela": "Trivela", "Flair": "Flair", "Power-Kopfball": "Power Header", "In der Luft": "Aerial",
+  "Führungsstärke": "Leadership", "Distanzsch. (CPU-KI)": "Long Shot Taker", "Frühes Flanken (CPU-KI)": "Early Crosser"
  }
 }
