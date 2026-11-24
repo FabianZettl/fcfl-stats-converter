@@ -38,10 +38,10 @@ class FMList:
     def __len__(self):
         return len(self.rows)
 
-    def find(self, name, club=None, age=None, height=None):
+    def find(self, name, club=None, age=None, height=None, nation=None, min_score=0):
         """the player of the list for a player of the database, or None. Candidates have his name; each gets points for what fits (club, age, height) and loses points for what does
         not: club (some word of the club name is the same) +2, unknown or another club 0 (players move); age 0 / 1 / 2 / more years apart +2 / +1 / -1 / -3; height within 2 cm / 5 cm / more
-        +2 / 0 / -2. The best one is taken when it has at least 0 points and is at least one point ahead of the next."""
+        +2 / 0 / -2; nation (the same country name) +2, another -2, unknown 0. The best one is taken when it has at least `min_score` points and is at least one point ahead of the next."""
         c = list(self.by_name.get(fcdb.fold(name), []))
         if not c:
             return None
@@ -55,9 +55,11 @@ class FMList:
             h = height_of(r)
             if height and h:
                 v += 2 if abs(h - height) <= 2 else 0 if abs(h - height) <= 5 else -2
+            if nation and (r.get('Nationality') or '').strip():
+                v += 2 if fcdb.fold(nation) == fcdb.fold(r['Nationality']) else -2
             sc.append((v, r))
         sc.sort(key=lambda x: -x[0])
-        if sc[0][0] < 0 or (len(sc) > 1 and sc[0][0] - sc[1][0] < 1):
+        if sc[0][0] < min_score or (len(sc) > 1 and sc[0][0] - sc[1][0] < 1):
             return None
         return sc[0][1]
 

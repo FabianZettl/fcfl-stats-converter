@@ -7,6 +7,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import shutil
 import struct
 import sys
@@ -412,10 +413,30 @@ def fm_list():
     return FML['l']
 
 
+NAT = dict(key=None, map={})
+
+
+def nat_names():
+    """PES nation number (Player.bin bit 233) -> country name as the FM list writes it, learned from the players that are matched with great certainty (club, age and height fit, 4+ points):
+    the most frequent country of the FM rows for that number, when it is at least 80 % of at least 3 players"""
+    l = fm_list()
+    key = (id(M), len(l), FML.get('sig'))
+    if NAT['key'] != key:
+        votes = collections.defaultdict(collections.Counter)
+        for pid in M.pb.ids:
+            n = M.name.get(pid) or ''
+            if fcdb.fold(n) in l.by_name:
+                r = l.find(n, club_name(pid), M.age.get(pid), M.height.get(pid), min_score=4)
+                if r is not None and (r.get('Nationality') or '').strip():
+                    votes[M.pb.nationality(M.pb.index[pid])][r['Nationality'].strip()] += 1
+        NAT.update(key=key, map={k: c.most_common(1)[0][0] for k, c in votes.items() if sum(c.values()) >= 3 and c.most_common(1)[0][1] >= 0.8 * sum(c.values())})
+    return NAT['map']
+
+
 def fm_row(pid):
     """the row of the FM list for a player of the database, or None"""
     l = fm_list()
-    r = l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid), M.height.get(pid)) if len(l) else None
+    r = l.find(M.name.get(pid) or '', club_name(pid), M.age.get(pid), M.height.get(pid), nat_names().get(M.pb.nationality(M.pb.index[pid]))) if len(l) else None
     return r if r is not None and fmdb.plausible(r, pos_of(pid)) else None   # a row that does not fit his position is another player
 
 
@@ -428,6 +449,18 @@ def convertible(pid):
         return False
     fr = fm_row(pid)
     return fr is not None and fmdb.complete(fr)
+
+
+def fm_info(fr):
+    """what the FM list knows about the player, for the player page (the counterpart of what the EA FC entry shows)"""
+    try:
+        bd = time.strftime('%d-%m-%Y', time.strptime((fr.get('Date of birth') or '').strip(), '%d %B %Y'))
+    except ValueError:
+        bd = ''
+    roles = [re.sub(r'\s+[\d.]+$', '', x.strip()) for x in (fr.get('Roles (FMInside score)') or '').split('|')][:4]
+    n = lambda k: fmdb._int(fr.get(k))
+    return dict(full=(fr.get('Full name') or fr.get('Name') or '').strip(), nation=(fr.get('Nationality') or '').strip(), birthdate=bd, club=(fr.get('Club') or '').strip(), fm_pos=(fr.get('Positions') or '').strip(),
+                fm_ability=n('Ability (0-99)'), fm_potential=n('Potential (0-99)'), fm_weak=n('Weak foot'), fm_roles=[r for r in roles if r])
 
 
 def club_name(pid):
@@ -966,6 +999,13 @@ def preview(body):
                          birthdate=raw.get('birthdate') or '', height=M.pb.height(i), weight=M.pb.weight(i), foot=M.pb.foot(i), ea_foot=raw.get('foot') or '', weak_foot=raw.get('weak_foot') or '',
                          skill_moves=raw.get('skill_moves') or '', rating=(row or {}).get('rating') if row and not fm else None, potential=(row or {}).get('potential') if row and not fm else None,
                          ea_pos=raw.get('position') or '', age=M.age.get(pid))
+        if fmr is not None:   # FM: the source of this player (nothing from EA FC), or the extras next to EA FC
+            fi = fm_info(fmr)
+            if row and not fm:
+                p['info'].update(fm_weak=fi['fm_weak'], fm_roles=fi['fm_roles'])
+            else:
+                p['info'].update(full=fi['full'], nation=fi['nation'], birthdate=fi['birthdate'], club_ea=fi['club'], fm_pos=fi['fm_pos'], fm_ability=fi['fm_ability'],
+                                 fm_potential=fi['fm_potential'], fm_weak=fi['fm_weak'], fm_roles=fi['fm_roles'], src='FM')
         p['gaffer'] = gaffer_player(pid)
         p['traits'] = dict(skills=sorted(M.pb.skills(i)), com=sorted(M.pb.com_styles(i)), style=M.pb.playing_style(i), weak_use=M.pb.weak_foot_use(i), weak_acc=M.pb.weak_foot_acc(i))
         p['ea_styles'] = sorted(playstyle.parse(row['raw'].get('playstyles')).items()) if row and not fm else []

@@ -182,6 +182,7 @@ PlayerBin.playing_style, PlayerBin.set_playing_style = _pb_style, _pb_set_style
 PlayerBin.weak_foot_use = lambda self, i: self.bits(i, WEAK_USE_OFF, 2) + 1
 PlayerBin.weak_foot_acc = lambda self, i: self.bits(i, WEAK_ACC_OFF, 2) + 1
 PlayerBin.positions = _pb_positions
+PlayerBin.nationality = lambda self, i: self.bits(i, 233, 9)   # PES number of the nation (9 bit at bit 233, found in pesm-rust)
 
 
 def _pb_set_positions(self, i, levels):
