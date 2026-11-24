@@ -4,7 +4,7 @@ Releases of FCFL - Stats Converter, newest first. (`CHANGES.md` lists what is di
 
 ## v0.7.4 - (not released yet)
 * **"Values are as of" can be changed** in the settings (it was fixed to 01.09.2026). Automatic = the date of the standard database or of the newest update that brought something (24.11.2026 now); a typed date overrides it, *Automatic* takes it back. The development to the write date and the age of the players count from it.
-* FM list of 24,000 players (15,800 with every attribute); FM calibration from 9,400 players: field players 5.7 -> 4.3, keepers 5.8 -> 2.0.
+* FM list of 25,000 players (16,300 with every attribute); FM calibration from 9,600 players: field players 5.7 -> 4.3, keepers 5.8 -> 2.0.
 * **Only the date decides** which row of a SoFIFA update counts. v0.7.3 ranked the updates by the number in the file name; that number is only a counter of the scraper. The standard database (`sofifa-base-2026-11-24.csv`) has the state of 24 Nov 2026: an update dated before or on that day changes nothing and brings back no player the base lacks; a later one is laid over by date, whatever its number is.
 
 ## v0.7.3 - 2026-11-24
