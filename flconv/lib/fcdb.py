@@ -61,20 +61,84 @@ def _read(path):
         return [r for r in csv.DictReader(f) if r.get('club_name') not in ('ICON', 'Hero') and r.get('rating')]   # special cards are no real squads
 
 
+# the German SoFIFA export (column titles in German, ';', one row per player): column -> column of the EA FC export (the values are the same, SoFIFA shows the EA FC values)
+_DE_COLS = {'Flanken': 'crossing', 'Abschluss': 'finishing', 'Kopfball-Präzision': 'heading', 'Kurzpässe': 'short_passing', 'Volleys': 'volleys', 'Ballkontrolle': 'ball_control', 'Effet': 'curve',
+            'Dribbling': 'dribbling', 'Freistoß-Präzision': 'free_kick_accuracy', 'Lange Pässe': 'long_passing', 'Beschleunigung': 'acceleration', 'Sprintgeschwindigkeit': 'sprint_speed',
+            'Beweglichkeit': 'agility', 'Reaktionen': 'reactions', 'Balance': 'balance', 'Schusskraft': 'shot_power', 'Sprungkraft': 'jumping', 'Ausdauer': 'stamina', 'Stärke': 'strength',
+            'Fernschüsse': 'long_shots', 'Aggressivität': 'aggression', 'Abfangen': 'interceptions', 'Stellungssp.': 'positioning', 'Übersicht': 'vision', 'Elfmeter': 'penalties',
+            'Ruhe': 'composure', 'Defensives Bewusstsein': 'def_awareness', 'Faire Zweikämpfe': 'standing_tackle', 'Grätsche': 'sliding_tackle', 'TH Flugparaden': 'gk_diving',
+            'TH Fangsicherheit': 'gk_handling', 'TH Abschlag': 'gk_kicking', 'TH Stellungsspiel': 'gk_positioning', 'TH Reflexe': 'gk_reflexes'}
+_DE_POS = {'TW': 'GK', 'IV': 'CB', 'LV': 'LB', 'RV': 'RB', 'LAV': 'LWB', 'RAV': 'RWB', 'ZDM': 'CDM', 'ZM': 'CM', 'ZOM': 'CAM', 'LM': 'LM', 'RM': 'RM', 'LF': 'LW', 'RF': 'RW', 'ST': 'ST', 'MS': 'CF'}
+_COUNTRIES = {}
+
+
+def _country(de):
+    if not _COUNTRIES:
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'countries_de_en.json'), encoding='utf-8') as f:
+                _COUNTRIES.update(__import__('json').load(f))
+        except (OSError, ValueError):
+            _COUNTRIES['_'] = ''
+    return _COUNTRIES.get(de, de)
+
+
+def _sniff(path):
+    """-> (delimiter, field names) of a csv"""
+    with open(path, encoding='utf-8-sig', newline='') as f:
+        head = f.readline()
+    d = ';' if head.count(';') > head.count(',') else ','
+    return d, next(csv.reader([head], delimiter=d), [])
+
+
+def read_update(path):
+    """the rows of an update in the form of the EA FC export (dicts of strings), or None when the file is no update: the EA FC export itself (column base_id) or the German SoFIFA export
+    (columns ID and Gesamtbewertung; only what can be translated safely is taken over: rating, potential, club, nation, position, height, weight, foot, weak foot, skill moves, the 34
+    attribute values; the PlayStyles stay those of the standard database). The date of a SoFIFA export is the one in its file name (sofifa-updates-270007-2026-11-24.csv)."""
+    d, cols = _sniff(path)
+    with open(path, encoding='utf-8-sig', newline='') as f:
+        rows = list(csv.DictReader(f, delimiter=d))
+    if 'base_id' in cols and 'rating' in cols:
+        return [r for r in rows if r.get('club_name') not in ('ICON', 'Hero') and r.get('rating')]
+    if 'ID' not in cols or 'Gesamtbewertung' not in cols:
+        return None
+    m = re.search(r'(?<!\d)(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})(?!\d)', os.path.basename(path))
+    mt = time.localtime(os.path.getmtime(path))
+    snap = '%s-%s-%s' % (m.group(3), m.group(2), m.group(1)) if m else '%02d-%02d-%d' % (mt.tm_mday, mt.tm_mon, mt.tm_year)
+    out = []
+    for r in rows:
+        if not (r.get('ID') or '').strip().isdigit() or not _int(r.get('Gesamtbewertung')):
+            continue
+        full = (r.get('Vollständiger Name') or r.get('Name') or '').strip()
+        parts = full.split()
+        pos = [_DE_POS[t] for t in re.findall(r'[A-Z]+', r.get('Positionen') or '') if t in _DE_POS]
+        h = re.search(r'(\d+)\s*cm', r.get('Größe') or '')
+        w = re.search(r'(\d+)\s*kg', r.get('Gewicht') or '')
+        n = dict(base_id=r['ID'].strip(), stats_id=r['ID'].strip(), first_name=' '.join(parts[:-1]) or full, last_name=parts[-1] if len(parts) > 1 else '', full_name=full, common_name='',
+                 nation_name=_country((r.get('Nationalität') or '').strip()), club_name=(r.get('Verein') or '').strip(), position=pos[0] if pos else '',
+                 position_alt=pos[1] if len(pos) > 1 else '', position_alt_2=pos[2] if len(pos) > 2 else '', position_alt_3=pos[3] if len(pos) > 3 else '',
+                 rating=str(_int(r['Gesamtbewertung'])), potential=str(_int(r.get('Potenzial')) or ''), height=h.group(1) if h else '', weight=w.group(1) if w else '',
+                 foot={'Rechts': 'Right', 'Links': 'Left'}.get((r.get('foot') or '').strip(), ''), weak_foot=str(_int(r.get('Schwacher Fuß')) or ''), skill_moves=str(_int(r.get('Spezialbewegungen')) or ''),
+                 birthdate='01-01-%s' % r['Geburtsjahr'].strip() if (r.get('Geburtsjahr') or '').strip().isdigit() else '', snapshot=snap)
+        for de, en in _DE_COLS.items():
+            if _int(r.get(de)) is not None:
+                n[en] = str(_int(r[de]))
+        out.append(n)
+    return out
+
+
 def update_files(folder):
-    """The SoFIFA updates in a folder (every csv with the columns base_id and snapshot), oldest first: [dict(path, name, date)]. The date of an update is the newest snapshot in it, else a date in the
-    file name (fc27-players-2026-11-24.csv), else the day the file was changed."""
+    """The SoFIFA updates in a folder (every csv that read_update takes), oldest first: [dict(path, name, date)]. The date of an update is the newest snapshot in it, else a date in the file name
+    (fc27-players-2026-11-24.csv), else the day the file was changed."""
     out = []
     for path in sorted(glob.glob(os.path.join(folder or '', '*.csv'))):
         try:
-            with open(path, encoding='utf-8-sig', newline='') as f:
-                rd = csv.DictReader(f)
-                if not rd.fieldnames or 'base_id' not in rd.fieldnames or 'rating' not in rd.fieldnames:
-                    continue
-                snap = max((d for d in (_date(r.get('snapshot')) for r in rd) if d), default=None)
-        except OSError:
+            rows = read_update(path)
+        except (OSError, csv.Error, UnicodeDecodeError):
             continue
-        m = re.search(r'(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})', os.path.basename(path))
+        if not rows:
+            continue
+        snap = max((d for d in (_date(r.get('snapshot')) for r in rows) if d), default=None)
+        m = re.search(r'(?<!\d)(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})(?!\d)', os.path.basename(path))
         mt = time.localtime(os.path.getmtime(path))
         fdate = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (mt.tm_year, mt.tm_mon, mt.tm_mday)
         out.append(dict(path=path, name=os.path.basename(path), date=snap or fdate, mtime=os.path.getmtime(path)))
@@ -95,11 +159,15 @@ class DB:
             cur[r.get('base_id') or r['stats_id']] = (_date(r.get('snapshot')) or (), r, 'standard')
         for u in updates:
             n = used = 0
-            for r in _read(u['path']):
+            for r in read_update(u['path']) or []:
                 n += 1
                 k, d = r.get('base_id') or r.get('stats_id'), _date(r.get('snapshot')) or u['date']
-                if k not in cur or d >= (cur[k][0] or ()):
+                if k not in cur:
                     cur[k] = (d, r, u['name'])
+                elif d >= (cur[k][0] or ()):   # the same player: what the update says replaces the values, what it does not say (PlayStyles, ...) stays
+                    nr = dict(cur[k][1])
+                    nr.update({a: b for a, b in r.items() if b not in ('', None)})
+                    cur[k] = (d, nr, u['name'])
             self.updates.append(dict(name=u['name'], date=u['date'], rows=n))
         for lab in {v[2] for v in cur.values()}:
             for u in self.updates:

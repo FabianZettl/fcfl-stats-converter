@@ -2,6 +2,7 @@
 """FCFL - Stats Converter: converts EA FC (or FMInside / SoFIFA page) stats into the player database of Football Life (Player.bin), for one player, a club, a league or the whole
 database, always with a backup and a check.   python3 server.py [--port 8790] [--data-dir DIR]"""
 import argparse
+import csv
 import difflib
 import glob
 import hashlib
@@ -560,13 +561,17 @@ def ea_update_add(name, text):
     """a SoFIFA update (CSV like the EA FC export, columns base_id and rating) loaded on the start page: kept in the folder ea-updates and used at once"""
     name = re.sub(r'[^A-Za-z0-9._-]', '_', os.path.basename(str(name or 'update.csv')))
     name = name if name.lower().endswith('.csv') else name + '.csv'
-    cols = [c.strip() for c in str(text or '').lstrip('\ufeff').split('\n', 1)[0].split(',')]
-    if 'base_id' not in cols or 'rating' not in cols:
-        return dict(ok=False, msg='This is not a SoFIFA / EA FC player export (the columns base_id and rating are missing).')
     d = ea_updates_dir()
     os.makedirs(d, exist_ok=True)
-    tmp = os.path.join(d, name + '.tmp')
-    open(tmp, 'w', encoding='utf-8', newline='').write(str(text).lstrip('\ufeff'))
+    tmp = os.path.join(d, '.upload-' + name)
+    open(tmp, 'w', encoding='utf-8', newline='').write(str(text or '').lstrip('\ufeff'))
+    try:
+        ok = bool(fcdb.read_update(tmp))
+    except (csv.Error, UnicodeDecodeError, OSError):
+        ok = False
+    if not ok:
+        os.remove(tmp)
+        return dict(ok=False, msg='This is not a SoFIFA player export (neither the EA FC columns base_id and rating nor the German SoFIFA columns ID and Gesamtbewertung, or no player rows).')
     os.replace(tmp, os.path.join(d, name))
     ea_refresh_force()
     u = next((x for x in EA.updates if x['name'] == name), None)
